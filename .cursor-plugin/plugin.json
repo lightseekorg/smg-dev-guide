@@ -6,8 +6,8 @@
   "author": {
     "name": "LightSeek"
   },
-  "homepage": "https://github.com/lightseekorg/smg-claude-plugin",
-  "repository": "https://github.com/lightseekorg/smg-claude-plugin",
+  "homepage": "https://github.com/lightseekorg/smg-dev-guide",
+  "repository": "https://github.com/lightseekorg/smg-dev-guide",
   "license": "Apache-2.0",
   "keywords": ["smg", "llm-gateway", "rust", "kubernetes", "routing", "grpc"],
   "skills": "./skills/",
