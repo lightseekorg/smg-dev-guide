@@ -1,0 +1,12 @@
+# Default owners for the smg-dev-guide plugin
+* @slin1237
+
+# Skills
+skills/  @slin1237
+commands/ @slin1237
+
+# Plugin config
+.cursor-plugin/ @slin1237
+
+# CI / repo setup
+.github/ @slin1237
