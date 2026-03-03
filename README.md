@@ -5,7 +5,7 @@ Claude Code plugin for the [Shepherd Model Gateway](https://github.com/lightseek
 ## Install
 
 ```bash
-claude plugins add github:lightseekorg/smg-dev-guide
+claude marketplace add lightseekorg/smg-dev-guide
 ```
 
 ## Usage
