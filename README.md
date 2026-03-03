@@ -1,32 +1,52 @@
-# SMG Claude Plugin
+# SMG Dev Guide
 
-Claude Code plugin for the [Shepherd Model Gateway](https://github.com/lightseekorg/smg) — 4 process-enforcing skills that change what Claude **does**, not just what it **knows**.
+AI-powered development guide for the [Shepherd Model Gateway](https://github.com/lightseekorg/smg) — 4 process-enforcing skills that change what your AI coding agent **does**, not just what it **knows**.
+
+Works with **Claude Code**, **Codex**, and **Cursor**.
 
 ## Install
 
+### Claude Code
+
 ```bash
-claude plugins add github:lightseekorg/smg-dev-guide
+claude marketplace add lightseekorg/smg-dev-guide
 ```
+
+### Codex
+
+Copy or symlink the skills into your user skills directory:
+
+```bash
+git clone https://github.com/lightseekorg/smg-dev-guide.git ~/.agents/repos/smg-dev-guide
+ln -s ~/.agents/repos/smg-dev-guide/.agents/skills/* ~/.agents/skills/
+```
+
+Or clone into the SMG repo and skills are discovered automatically from `.agents/skills/`.
+
+### Cursor
+
+Install as a Cursor plugin via `.cursor-plugin/plugin.json`.
 
 ## Usage
 
-Single entry point — `/smg` routes based on what you're doing:
-
-```
-/smg where does the label pipeline live     # → smg:map (orientation)
-/smg add a --timeout flag                   # → smg:implement (step-by-step recipe)
-/smg review PR #562                         # → smg:review-pr (systematic checklist)
-/smg am I ready to submit                   # → smg:contribute (quality gates)
-```
-
-## Skills
+4 skills, each enforcing a specific developer action:
 
 | Skill | Action | What It Does |
 |-------|--------|-------------|
-| `smg:map` | Orient | Crate map, layering rules, config propagation, request flow, label pipeline |
-| `smg:implement` | Build | Detects subsystem, loads recipe, creates tasks, enforces step-by-step execution with verification |
-| `smg:review-pr` | Review | Maps changed files to checklist sections, creates review tasks per subsystem, cites file:line |
-| `smg:contribute` | Ship | 5-step quality gate (fmt → clippy → test → bindings → commit format) with enforcement |
+| `map` | Orient | Crate map, layering rules, config propagation, request flow, label pipeline |
+| `implement` | Build | Detects subsystem, loads recipe, creates tasks, enforces step-by-step execution with verification |
+| `review-pr` | Review | Maps changed files to checklist sections, creates review tasks per subsystem, cites file:line |
+| `contribute` | Ship | 5-step quality gate (fmt → clippy → test → bindings → commit format) with enforcement |
+
+**Claude Code** — use the `/smg` command:
+```
+/smg where does the label pipeline live     → smg:map
+/smg add a --timeout flag                   → smg:implement
+/smg review PR #562                         → smg:review-pr
+/smg am I ready to submit                   → smg:contribute
+```
+
+**Codex** — skills trigger automatically based on your prompt, or invoke explicitly via `$smg-implement`, `$smg-contribute`, etc.
 
 ## How It Works
 
@@ -40,7 +60,7 @@ Unlike passive reference docs, these skills **enforce workflows**:
 
 ## Implementation Recipes
 
-`smg:implement` auto-detects what you're building and loads the right recipe:
+`implement` auto-detects what you're building and loads the right recipe:
 
 | Recipe | Subsystem |
 |--------|-----------|
@@ -59,6 +79,21 @@ Unlike passive reference docs, these skills **enforce workflows**:
 | mcp-feature | MCP protocol, tool execution |
 | kv-index-feature | Radix trees, cache-aware routing |
 | multimodal-feature | Vision processors, media pipeline |
+
+## Directory Structure
+
+```
+.claude-plugin/          # Claude Code marketplace manifest
+.cursor-plugin/          # Cursor plugin manifest
+.agents/skills/          # Codex skill discovery (symlinks to skills/)
+skills/                  # Skill source files
+  map/SKILL.md
+  contribute/SKILL.md
+  review-pr/SKILL.md
+  implement/SKILL.md     # + 15 recipe files
+commands/                # Claude Code /smg command router
+  smg.md
+```
 
 ## License
 
