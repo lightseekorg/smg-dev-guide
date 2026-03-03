@@ -2,9 +2,36 @@
 
 AI-powered development guide for the [Shepherd Model Gateway](https://github.com/lightseekorg/smg) — 4 process-enforcing skills that change what your AI coding agent **does**, not just what it **knows**.
 
-Works with **Claude Code**, **Codex**, and **Cursor**.
+Works with **Google Antigravity**, **Gemini CLI**, **Claude Code**, **Codex**, and **Cursor**.
 
 ## Install
+
+### Google Antigravity
+
+**Project-level (Recommended)**: Antigravity natively supports the skills through its workflow system. Simply open this repository (or copy the `.agents/` and `skills/` directories into your SMG project root) in the Antigravity IDE and it will automatically discover them.
+
+**Global**: To make these skills and workflows available across all projects, copy or symlink them into your global Antigravity `~/.gemini/antigravity/` directory:
+
+```bash
+git clone https://github.com/lightseekorg/smg-dev-guide.git ~/.gemini/antigravity/repos/smg-dev-guide
+mkdir -p ~/.gemini/antigravity/workflows ~/.gemini/antigravity/skills
+ln -s ~/.gemini/antigravity/repos/smg-dev-guide/.agents/workflows/* ~/.gemini/antigravity/workflows/
+ln -s ~/.gemini/antigravity/repos/smg-dev-guide/skills/* ~/.gemini/antigravity/skills/
+```
+
+### Gemini CLI
+
+The Gemini CLI natively supports Agent Skills. You can install these skills directly from the repository using the CLI's built-in package manager.
+
+**Global Installation (Available in all projects)**:
+```bash
+gemini skills install https://github.com/lightseekorg/smg-dev-guide.git
+```
+
+**Workspace Installation (Only in current project)**:
+```bash
+gemini skills install https://github.com/lightseekorg/smg-dev-guide.git --scope workspace
+```
 
 ### Claude Code
 
@@ -37,6 +64,21 @@ Install as a Cursor plugin via `.cursor-plugin/plugin.json`.
 | `implement` | Build | Detects subsystem, loads recipe, creates tasks, enforces step-by-step execution with verification |
 | `review-pr` | Review | Maps changed files to checklist sections, creates review tasks per subsystem, cites file:line |
 | `contribute` | Ship | 5-step quality gate (fmt → clippy → test → bindings → commit format) with enforcement |
+
+**Google Antigravity** — invoke workflows using slash commands in the chat:
+```
+/map                         → discover codebase structure and ownership
+/implement-feature           → guides you through building a feature
+/review-pr                   → checks your work against anti-patterns
+/verify-pr                   → runs the full 5-step quality gate
+```
+
+**Gemini CLI** — skills trigger automatically based on your prompt:
+```
+"Where does the label pipeline live?"      → Activates map skill
+"Am I ready to submit?"                    → Activates contribute skill
+```
+*Note: You can view installed skills by running `gemini skills list`.*
 
 **Claude Code** — use the `/smg` command:
 ```
@@ -83,6 +125,7 @@ Unlike passive reference docs, these skills **enforce workflows**:
 ## Directory Structure
 
 ```
+.agents/workflows/       # Antigravity workflow definitions
 .claude-plugin/          # Claude Code marketplace manifest
 .cursor-plugin/          # Cursor plugin manifest
 .agents/skills/          # Codex skill discovery (symlinks to skills/)
