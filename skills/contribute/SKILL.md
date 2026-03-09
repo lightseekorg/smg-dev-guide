@@ -98,23 +98,23 @@ let value = parse(input).context("parsing model config")?;
 | Change config | `model_gateway/src/config/types.rs` |
 | Change worker creation | `model_gateway/src/core/steps/worker/local/` |
 | Change service discovery | `model_gateway/src/service_discovery.rs` |
-| Change API types | `protocols/src/` (careful — shared by all crates) |
+| Change API types | `crates/protocols/src/` (careful — shared by all crates) |
 | Add routing policy | `model_gateway/src/core/routing/` |
-| Add tool parser | `tool_parser/src/parsers/` |
-| Add reasoning parser | `reasoning_parser/src/parsers/` |
+| Add tool parser | `crates/tool_parser/src/parsers/` |
+| Add reasoning parser | `crates/reasoning_parser/src/parsers/` |
 | Update Python bindings | `bindings/python/src/lib.rs` |
 | Update Go SDK | `bindings/golang/` |
-| Add storage backend | `data_connector/src/` |
+| Add storage backend | `crates/data_connector/src/` |
 | Add E2E tests | `e2e_test/` |
-| Add WASM middleware | `wasm/examples/` |
-| Add MCP tool support | `mcp/src/` |
+| Add WASM middleware | `crates/wasm/examples/` |
+| Add MCP tool support | `crates/mcp/src/` |
 
 ## Rationalization Prevention
 
 | Excuse | Reality |
 |--------|---------|
 | "Clippy is clean enough with a few warnings" | `-D warnings` means zero. One warning = not clean. |
-| "I didn't change bindings, skip step 4" | If you touched `config/types.rs` or `protocols/`, the struct literal in `bindings/python/src/lib.rs` may need a default. Check. |
+| "I didn't change bindings, skip step 4" | If you touched `config/types.rs` or `crates/protocols/`, the struct literal in `bindings/python/src/lib.rs` may need a default. Check. |
 | "Only touched one file, don't need full gate" | The two-path config rule means a one-file change can silently break propagation. Run all five. |
 | "Tests are slow, I'll run them later" | "Later" means shipping untested code. Run them now. |
 | "It's just a docs change" | Even docs PRs need clean formatting and conventional commits. Steps 1 and 5 still apply. |

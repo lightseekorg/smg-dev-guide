@@ -104,7 +104,7 @@ Observe the raw format before the API normalizes it.
 
 ## Step 1: Create parser file
 
-**File:** `tool_parser/src/parsers/{PARSER_NAME}.rs`
+**File:** `crates/tool_parser/src/parsers/{PARSER_NAME}.rs`
 
 For the most common case — **JSON with tags** — generate this template:
 
@@ -251,26 +251,26 @@ impl ToolParser for {ParserName}Parser {
 }
 ```
 
-**Verify:** `cargo check -p tool_parser`
+**Verify:** `cargo check -p tool-parser`
 
 ## Step 2: Register in module exports
 
-**File:** `tool_parser/src/parsers/mod.rs` — add:
+**File:** `crates/tool_parser/src/parsers/mod.rs` — add:
 ```rust
 pub mod {PARSER_NAME};
 pub use {PARSER_NAME}::{ParserName}Parser;
 ```
 
-**File:** `tool_parser/src/lib.rs` — add to the `pub use parsers::{ ... }` block:
+**File:** `crates/tool_parser/src/lib.rs` — add to the `pub use parsers::{ ... }` block:
 ```rust
 {ParserName}Parser,
 ```
 
-**Verify:** `cargo check -p tool_parser`
+**Verify:** `cargo check -p tool-parser`
 
 ## Step 3: Register in factory
 
-**File:** `tool_parser/src/factory.rs`
+**File:** `crates/tool_parser/src/factory.rs`
 
 In `ParserFactory::new()`:
 ```rust
@@ -285,11 +285,11 @@ registry.map_model("{model-pattern-2}*", "{PARSER_NAME}");
 
 Pattern matching uses **glob wildcards** (`*` matches any characters).
 
-**Verify:** `cargo check -p tool_parser`
+**Verify:** `cargo check -p tool-parser`
 
 ## Step 4: Write tests
 
-**File:** `tool_parser/tests/tool_parser_{PARSER_NAME}.rs`
+**File:** `crates/tool_parser/tests/tool_parser_{PARSER_NAME}.rs`
 
 ```rust
 mod common;

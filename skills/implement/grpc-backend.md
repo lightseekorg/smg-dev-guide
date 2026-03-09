@@ -6,7 +6,7 @@ gRPC clients connect to LLM backends (SGLang, vLLM, TRT). Use shared macros for 
 
 ### Step 1: Create client file
 
-**File:** `grpc_client/src/mybackend.rs`
+**File:** `crates/grpc_client/src/mybackend.rs`
 
 Implement connection, health check, and inference methods. Use shared macros:
 ```rust

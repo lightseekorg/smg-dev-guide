@@ -140,7 +140,7 @@ This flag controls whether the parser assumes the first token is reasoning or no
 
 ## Step 1: Create parser file
 
-**File:** `reasoning_parser/src/parsers/{MODEL_NAME}.rs`
+**File:** `crates/reasoning_parser/src/parsers/{MODEL_NAME}.rs`
 
 Generate this file, substituting the 4 inputs:
 
@@ -282,26 +282,26 @@ mod tests {
 }
 ```
 
-**Verify:** `cargo check -p reasoning_parser`
+**Verify:** `cargo check -p reasoning-parser`
 
 ## Step 2: Register in module exports
 
-**File:** `reasoning_parser/src/parsers/mod.rs` — add:
+**File:** `crates/reasoning_parser/src/parsers/mod.rs` — add:
 ```rust
 pub mod {MODEL_NAME};
 pub use {MODEL_NAME}::{ModelName}Parser;
 ```
 
-**File:** `reasoning_parser/src/lib.rs` — add to the `pub use parsers::{ ... }` block:
+**File:** `crates/reasoning_parser/src/lib.rs` — add to the `pub use parsers::{ ... }` block:
 ```rust
 {ModelName}Parser,
 ```
 
-**Verify:** `cargo check -p reasoning_parser`
+**Verify:** `cargo check -p reasoning-parser`
 
 ## Step 3: Register in factory
 
-**File:** `reasoning_parser/src/factory.rs` — in `ParserFactory::new()`, add:
+**File:** `crates/reasoning_parser/src/factory.rs` — in `ParserFactory::new()`, add:
 
 ```rust
 // Parser registration
@@ -314,12 +314,12 @@ registry.register_pattern("{pattern-2}", "{MODEL_NAME}");
 
 Pattern matching is **case-insensitive substring**: `model_id.to_lowercase().contains(pattern)`.
 
-**Verify:** `cargo check -p reasoning_parser`
+**Verify:** `cargo check -p reasoning-parser`
 
 ## Step 4: Run tests
 
 ```bash
-cargo test -p reasoning_parser
+cargo test -p reasoning-parser
 ```
 
 All 7 tests in the new file plus all existing tests must pass.

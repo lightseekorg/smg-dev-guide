@@ -6,7 +6,7 @@ Two-factor auth: API key (SHA-256) + JWT/OIDC. Roles: Admin (control plane) and 
 
 ### Adding a New Role
 
-1. Extend `Role` enum in `auth/src/`
+1. Extend `Role` enum in `crates/auth/src/`
 2. Update permission checks in middleware
 3. Update role mapping for JWT claims
 4. Add audit logging for new role actions
@@ -26,7 +26,7 @@ Two-factor auth: API key (SHA-256) + JWT/OIDC. Roles: Admin (control plane) and 
 
 ### Adding a Custom Auth Method
 
-1. Implement validation logic in `auth/src/`
+1. Implement validation logic in `crates/auth/src/`
 2. Extract `Principal` from request
 3. Integrate in middleware chain (`/admin/*` routes)
 4. Add audit event for the new method

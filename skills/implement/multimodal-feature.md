@@ -17,19 +17,20 @@ User message with image URL/data
 
 ### Adding a New Modality
 
-1. Extend `Modality` enum and `ChatContentPart` in `multimodal/src/`
+1. Extend `Modality` enum and `ChatContentPart` in `crates/multimodal/src/`
 2. Add fetch method to media connector
 3. Implement processing pipeline
 4. Track with UUID for deduplication
 
 ### Adding a Vision Processor
 
-**Directory:** `multimodal/src/vision/`
+**Directory:** `crates/multimodal/src/vision/`
 
 1. Implement processor trait (image → model-specific tensor format)
 2. Handle resizing, normalization, placeholder insertion
-3. Register in `ImageProcessorRegistry`
-4. Add NPZ array comparison tests for output validation
+3. Add per-model spec module in `crates/multimodal/src/registry/` (e.g. `mymodel.rs`)
+4. Register in the registry's `mod.rs`
+5. Add NPZ array comparison tests for output validation
 
 ### Adding a Media Source
 
