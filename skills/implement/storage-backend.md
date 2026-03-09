@@ -6,7 +6,7 @@
 
 ### Step 1: Create module
 
-**Directory:** `data_connector/src/mybackend/`
+**Directory:** `crates/data_connector/src/mybackend/`
 
 Implement all storage trait methods with consistent behavior across operations.
 

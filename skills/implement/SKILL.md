@@ -22,7 +22,7 @@ Do NOT write implementation code until you have:
 3. Created a task for each step in the recipe
 </HARD-GATE>
 
-**Escape hatch:** Single-file changes under 20 lines that don't touch `config/types.rs`, `protocols/`, `main.rs` (CliArgs or conversion functions), or `bindings/` may skip the full recipe. You MUST still chain to `smg:contribute` before PR.
+**Escape hatch:** Single-file changes under 20 lines that don't touch `config/types.rs`, `crates/protocols/`, `main.rs` (CliArgs or conversion functions), or `bindings/` may skip the full recipe. You MUST still chain to `smg:contribute` before PR.
 
 ## Detection Table
 

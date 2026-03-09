@@ -15,7 +15,7 @@ Both implement `RadixTree` trait: prefix insertion, longest-prefix-match, LRU ev
 
 ### Adding Index Features
 
-1. Implement in `kv_index/src/`
+1. Implement in `crates/kv_index/src/`
 2. Ensure `Send + Sync` (accessed from routing hot path)
 3. Support both String and Token variants if applicable
 4. Add eviction/cleanup mechanism (prevent unbounded memory)

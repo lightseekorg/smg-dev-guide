@@ -38,15 +38,15 @@ Do NOT write review comments, approve, or provide feedback until you have:
 
 | Files Changed | Review Sections |
 |---------------|-----------------|
-| `protocols/src/` | 1 (Layering), 3 (Worker Lifecycle) |
+| `crates/protocols/src/` | 1 (Layering), 3 (Worker Lifecycle) |
 | `model_gateway/src/config/` | 2 (Config Plumbing) |
 | `model_gateway/src/main.rs` | 2 (Config Plumbing) |
 | `model_gateway/src/service_discovery.rs` | 3 (Worker Lifecycle) |
 | `model_gateway/src/core/steps/worker/` | 3 (Worker Lifecycle) |
 | `model_gateway/src/core/routing/` | 4 (Routing Policy) |
-| `tool_parser/src/` | 5 (Parser Changes) |
-| `reasoning_parser/src/` | 5 (Parser Changes) |
-| `data_connector/src/` | 6 (Storage) |
+| `crates/tool_parser/src/` | 5 (Parser Changes) |
+| `crates/reasoning_parser/src/` | 5 (Parser Changes) |
+| `crates/data_connector/src/` | 6 (Storage) |
 | `bindings/` | 2 (Config Plumbing) |
 | Any file | 7 (Error Handling), 8 (Testing), 9 (Code Quality) |
 
@@ -56,7 +56,7 @@ Sections 7, 8, 9 always apply. Section 10 applies to PRs touching 3+ files or ad
 
 ### 1. Layering & Separation of Concerns
 
-- [ ] No new fields in `protocols/` types that only one crate sets
+- [ ] No new fields in `crates/protocols/` types that only one crate sets
 - [ ] Config types at correct layer: user-facing → `config/types.rs`, runtime → module-specific
 - [ ] No raw strings parsed at runtime — parse at boundary
 - [ ] WASM/MCP concerns stay in their crates, not leaking into core
@@ -111,8 +111,8 @@ Sections 7, 8, 9 always apply. Section 10 applies to PRs touching 3+ files or ad
 - [ ] Unit tests for new types/parsing including error cases
 - [ ] Integration test for full flow
 - [ ] Existing test struct literals updated with new fields
-- [ ] E2E tests if user-facing behavior changes
-- [ ] Thread-unsafe tests marked `@pytest.mark.thread_unsafe`
+- [ ] E2E tests if user-facing behavior changes (in `e2e_test/` — tests run sequentially with class-scoped backends)
+- [ ] E2E test markers set: `@pytest.mark.engine(...)`, `@pytest.mark.gpu(count)`, `@pytest.mark.model(...)` as needed
 
 ### 9. Code Quality
 
@@ -126,7 +126,7 @@ Sections 7, 8, 9 always apply. Section 10 applies to PRs touching 3+ files or ad
 
 ### 10. Architecture Smell Tests
 
-- "If I remove K8s, does this change still make sense?" → shouldn't be in `protocols/`
+- "If I remove K8s, does this change still make sense?" → shouldn't be in `crates/protocols/`
 - "Can existing config overrides or labels achieve this?" → may be unnecessary
 - "Does this compose with DP-aware mode, PD disagg, mesh HA?" → don't break existing
 - "Is this Send + Sync safe under concurrent load?" → all routing state thread-safe

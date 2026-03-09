@@ -14,9 +14,9 @@ Per-subsystem anti-patterns to check during PR review.
 
 | Anti-Pattern | Consequence | What to Look For |
 |-------------|-------------|------------------|
-| Adding `_override` field to WorkerSpec | Bypasses label pipeline, creates parallel data path | New fields on `WorkerSpec` in `protocols/src/worker.rs` |
+| Adding `_override` field to WorkerSpec | Bypasses label pipeline, creates parallel data path | New fields on `WorkerSpec` in `crates/protocols/src/worker.rs` |
 | Post-hoc ModelCard mutation | Race conditions, stale data in routing | `model_card.model_id = ...` after `build_model_card()` |
-| Injecting K8s-specific data into `protocols/` types | Tight coupling to K8s, breaks non-K8s deployments | New fields in `protocols/` that reference namespaces, pods, labels |
+| Injecting K8s-specific data into `crates/protocols/` types | Tight coupling to K8s, breaks non-K8s deployments | New fields in `crates/protocols/` that reference namespaces, pods, labels |
 
 ## Routing
 

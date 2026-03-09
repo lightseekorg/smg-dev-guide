@@ -5,7 +5,7 @@ SWIM gossip protocol with CRDT stores. Optional — only active with multiple ga
 ## Architecture
 
 ```
-mesh/src/
+crates/mesh/src/
   service.rs          → MeshServerBuilder, cluster state
   ping_server.rs      → SWIM gossip (60KB), message batching
   sync.rs             → MeshSyncManager, state reconciliation
@@ -20,10 +20,10 @@ mesh/src/
 
 ### Adding a New CRDT Store
 
-1. Define CRDT type in `mesh/src/crdt_kv/`
-2. Register in `StateStores` (`mesh/src/stores.rs`)
-3. Add sync logic in `MeshSyncManager` (`mesh/src/sync.rs`)
-4. Emit updates in gossip messages (`mesh/src/ping_server.rs`)
+1. Define CRDT type in `crates/mesh/src/crdt_kv/`
+2. Register in `StateStores` (`crates/mesh/src/stores.rs`)
+3. Add sync logic in `MeshSyncManager` (`crates/mesh/src/sync.rs`)
+4. Emit updates in gossip messages (`crates/mesh/src/ping_server.rs`)
 5. Version with `version: u64` for causality tracking
 
 ### Adding a Cluster Integration

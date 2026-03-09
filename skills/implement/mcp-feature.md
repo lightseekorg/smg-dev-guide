@@ -5,7 +5,7 @@ Model Context Protocol client for external tool servers. Manages discovery, exec
 ## Architecture
 
 ```
-mcp/src/
+crates/mcp/src/
   core/
     orchestrator.rs  → Tool execution, routing, validation (101KB)
     session.rs       → Server bindings, tool sessions
@@ -25,7 +25,7 @@ Implement `rmcp::Transport` trait for the new connection type.
 
 ### Adding a Response Format
 
-**Directory:** `mcp/src/transform/`
+**Directory:** `crates/mcp/src/transform/`
 
 Convert MCP tool results to API-compatible format (OpenAI function calling, Claude tool use, custom).
 
@@ -63,4 +63,4 @@ ToolAnnotations { read_only, destructive, idempotent, open_world }
 
 Use `#[serial_test]` for approval workflow tests (shared state).
 
-**Verify:** `cargo test -p mcp`
+**Verify:** `cargo test -p smg-mcp`

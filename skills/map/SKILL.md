@@ -25,23 +25,26 @@ High-performance Rust gateway for LLM inference backends. Routes requests to wor
 | `tool_parser` | 13+ tool call parsers (JSON, Mistral, Qwen, DeepSeek, Pythonic, etc.). Streaming with incremental JSON | `ToolParser` trait, `ParserFactory`, `StreamingParseResult` |
 | `reasoning_parser` | Reasoning extraction from 10+ model families (DeepSeek-R1, Qwen3, Kimi, Cohere). Streaming | `ReasoningParser` trait, `ParserFactory`, `ParserResult` |
 | `tokenizer` | LLM tokenization, chat templates | `Tokenizer` |
-| `multimodal` | Image/audio processing. Vision processors (LLaVA, LLaVA-Next), media fetching | `ImageFrame`, `MultiModalInputs`, `ChatContentPart` |
+| `multimodal` | Image/audio processing. Per-model vision specs (LLaVA, Qwen-VL, Llama4, Phi3-V), media fetching | `ImageFrame`, `ChatContentPart`, `MediaConnector` |
 | `workflow` | Step-based async workflow engine (wfaas) | `StepExecutor`, `WorkflowContext` |
 | `bindings/python` | PyO3 bindings. `Router` class with ~80 constructor params, enum mapping | `Router`, `PolicyType` |
 | `bindings/golang` | Go SDK via FFI (cgo). OpenAI-style API, streaming, tool calling | `Client`, `ChatCompletionRequest` |
 | `clients/rust` | Rust client library | |
+| `grpc_servicer` | Python gRPC servicer wrapping vLLM/SGLang backends | |
 
 ## Layering Rule
 
 ```
-protocols (shared types — ALL consumers)
+crates/protocols (shared types — ALL consumers)
     ↑
 model_gateway (implementation — ONE consumer writes each field)
     ↑
 bindings/* (language SDKs — wrap model_gateway + protocols)
 ```
 
-**Iron law**: If only one crate writes a field, it doesn't belong in `protocols/`. K8s-specific, runtime-specific, or gateway-specific fields stay in `model_gateway`.
+**Directory layout**: Library crates live under `crates/` (e.g. `crates/mcp/`, `crates/mesh/`). `model_gateway/` and `bindings/` remain at repo root.
+
+**Iron law**: If only one crate writes a field, it doesn't belong in `crates/protocols/`. K8s-specific, runtime-specific, or gateway-specific fields stay in `model_gateway`.
 
 ## Config Propagation (3-Stage)
 
@@ -61,6 +64,9 @@ ServiceDiscoveryConfig / ServerConfig — typed, runtime
 Client → HTTP/gRPC handler → Auth middleware → WASM OnRequest
   → Routing policy selects worker → Proxy to backend
   → Stream response → Tool/reasoning parsing → WASM OnResponse → Client
+
+Realtime (WebSocket):
+Client → WS upgrade → Realtime session registry → Proxy to backend WS
 ```
 
 ## Worker Lifecycle (5-Step Workflow)

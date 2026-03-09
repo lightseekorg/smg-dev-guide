@@ -21,7 +21,7 @@ Wasmtime component model with WIT interface. Plugins intercept requests/response
 
 ### Step 1: Define types in WIT (if new interface needed)
 
-**File:** `wasm/src/interface/spec.wit`
+**File:** `crates/wasm/src/interface/spec.wit`
 
 ```wit
 interface middleware-types {
@@ -33,23 +33,23 @@ interface middleware-types {
 
 ### Step 2: Add attachment point (if new hook)
 
-**File:** `wasm/src/module.rs`
+**File:** `crates/wasm/src/module.rs`
 
 Add to `MiddlewareAttachPoint` enum.
 
 ### Step 3: Implement handler matching
 
-**File:** `wasm/src/runtime.rs`
+**File:** `crates/wasm/src/runtime.rs`
 
 Match the new attachment point and execute WASM module.
 
 ### Step 4: Update module validation
 
-**File:** `wasm/src/module_manager.rs`
+**File:** `crates/wasm/src/module_manager.rs`
 
 ### Step 5: Write example guest plugin
 
-**Directory:** `wasm/examples/`
+**Directory:** `crates/wasm/examples/`
 
 ```rust
 wit_bindgen::generate!({ world: "smg" });
