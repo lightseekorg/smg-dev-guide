@@ -43,6 +43,11 @@ Do NOT write implementation code until you have:
 | MCP, tool execution, approval workflow | @mcp-feature.md |
 | KV cache, radix tree, prefix matching, positional indexer | @kv-index-feature.md |
 | Image, audio, vision, multimodal, media | @multimodal-feature.md |
+| Provider-compatible API router (Anthropic /v1/messages, Gemini /v1/interactions), RoutingMode variant, new API surface | @provider-api.md |
+| Priority scheduler, admission, preemption, queue, reservation, autoscaling | @scheduler-feature.md |
+| Multi-tenancy, tenant, tenant policy, tenant resolution | @tenancy-feature.md |
+| Rate limit, token bucket, concurrency cap | @rate-limit-feature.md |
+| Conversation/request memory | @memory-feature.md |
 
 ### Subsystems without a dedicated recipe yet
 
@@ -50,11 +55,7 @@ These are real, actively-developed subsystems that don't yet have a step-by-step
 
 | Signal in User Request | Where it lives |
 |------------------------|----------------|
-| Priority scheduler, admission, preemption, queue, slot, reservation, autoscaling | `model_gateway/src/middleware/scheduler/` |
-| Multi-tenancy, tenant, tenant policy, tenant resolution | `model_gateway/src/tenant.rs`, `model_gateway/src/middleware/tenant_resolution.rs` |
-| Rate limiting, token bucket, concurrency cap | `model_gateway/src/middleware/token_bucket.rs`, `model_gateway/src/middleware/concurrency.rs` |
-| Provider API (Anthropic, Gemini, Responses, Conversations, Realtime) | `model_gateway/src/routers/{anthropic,gemini,responses,conversations,openai/realtime}/` |
-| Conversation/request memory | `model_gateway/src/memory/` |
+| Provider API: Responses, Conversations, Realtime (for Anthropic/Gemini-style API routers see @provider-api.md) | `model_gateway/src/routers/{responses,conversations,openai/realtime}/` |
 | Skills subsystem | `crates/skills/`, `crates/blob_storage/`, `model_gateway/src/routers/skills/` |
 | Terminal UI | `tui/` |
 | Client SDK generation | `clients/openapi-gen/` (`make generate-clients`) |
