@@ -5,9 +5,9 @@ All metadata must flow through the label pipeline. Never add `_override` fields 
 ## The Label Pipeline
 
 ```
-Step 4 (DiscoverMetadataStep): Backend probe → discovered_labels HashMap
+DiscoverMetadataStep: Backend probe → discovered_labels HashMap
     ↓
-Step 5 (CreateLocalWorkerStep): Merge with config.labels (config wins)
+CreateLocalWorkerStep: Merge with config.labels (config wins)
     ↓ Extract special keys (kv_connector, kv_role)
     ↓ Resolve model_id (priority chain):
     ↓   1. config.models.primary()
@@ -46,7 +46,7 @@ worker_spec.labels.insert("my_key".to_string(), extracted_value);
 
 **File:** `model_gateway/src/workflow/steps/local/create_worker.rs`
 
-Read from merged labels in Step 5:
+Read from merged labels in `CreateLocalWorkerStep`:
 ```rust
 let my_value = labels.get("my_key");
 ```

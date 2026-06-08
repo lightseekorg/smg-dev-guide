@@ -1,58 +1,176 @@
-# Adding Multimodal Features to SMG
+# Adding a Vision Model to SMG
 
-Image/audio processing for vision-capable LLMs. Fetches media, preprocesses, tracks through pipeline.
+Image preprocessing for vision LLMs lives in the `llm-multimodal` crate (lib `llm_multimodal`, dir `crates/multimodal/`). The `MediaConnector` fetches an image into an `ImageFrame`, an `ImagePreProcessor` turns `DynamicImage`s into a `PreprocessedImages` tensor bundle, and a `ModelProcessorSpec` decides placeholder tokens + prompt expansion. Adding a model = a processor + a spec + two registrations.
 
 ## Pipeline
 
 ```
-User message with image URL/data
-  → Media connector fetches (URL, data URL, local file, inline bytes)
-  → ImageFrame created (DynamicImage + raw bytes + metadata)
-  → Vision processor (model-specific: LLaVA, LLaVA-Next)
-  → MultiModalInputs (token IDs, mm_kwargs, placeholders, cache salt)
-  → Included in prompt for backend
+MediaContentPart (Text | ImageUrl | ImageData | ImageEmbeds)   // types.rs
+  -> MediaConnector::fetch_image(MediaSource::{Url,DataUrl,InlineBytes,File})  // media.rs, Blake3 hash
+  -> Arc<ImageFrame> { image: DynamicImage, raw_bytes, detail, source, hash }
+  -> ImagePreProcessor::preprocess(&[DynamicImage], &PreProcessorConfig) -> PreprocessedImages
+  -> ModelProcessorSpec::prompt_replacements(...) -> Vec<PromptReplacement>  // expands placeholder tokens
+  -> tracker emits TrackerOutput { data: MultiModalData, uuids: MultiModalUUIDs }
 ```
+
+The worked example below mirrors the existing **Phi3-Vision** pair: `vision/processors/phi3_vision.rs` (`Phi3VisionProcessor`) and `registry/phi3_v.rs` (`Phi3VisionSpec`).
 
 ## Steps
 
-### Adding a New Modality
+### Step 1: Implement the processor
 
-1. Extend `Modality` enum and `ChatContentPart` in `crates/multimodal/src/`
-2. Add fetch method to media connector
-3. Implement processing pipeline
-4. Track with UUID for deduplication
+Implement `ImagePreProcessor` (`vision/image_processor.rs`). `preprocess` returns `PreprocessedImages` built with `::new` (4D `[B,C,H,W]`) or `::new_dynamic` (5D, e.g. Phi3's `[B,num_crops+1,C,H,W]`), plus `.with_extra(key, ModelSpecificValue)` for model-specific tensors. Reuse `transforms` for resize/normalize.
 
-### Adding a Vision Processor
-
-**Directory:** `crates/multimodal/src/vision/`
-
-1. Implement processor trait (image → model-specific tensor format)
-2. Handle resizing, normalization, placeholder insertion
-3. Add per-model spec module in `crates/multimodal/src/registry/` (e.g. `mymodel.rs`)
-4. Register in the registry's `mod.rs`
-5. Add NPZ array comparison tests for output validation
-
-### Adding a Media Source
-
-Add fetch method to media connector:
-- Domain whitelisting for URLs
-- Timeout handling (default 10s)
-- Content hashing for deduplication
-
-## Content Types
+**File:** `crates/multimodal/src/vision/processors/mymodel.rs`
 
 ```rust
-pub enum ChatContentPart {
-    Text { text: String },
-    ImageUrl { url, detail: Option<ImageDetail>, uuid },
-    ImageData { data: Vec<u8>, mime_type, uuid, detail },
-    ImageEmbeds { payload: Value, uuid },
+use image::DynamicImage;
+use crate::vision::{
+    image_processor::{ImagePreProcessor, PreprocessedImages},
+    preprocessor_config::PreProcessorConfig,
+    transforms::TransformError,
+};
+
+pub const MYMODEL_MEAN: [f64; 3] = [0.5, 0.5, 0.5];
+pub const MYMODEL_STD: [f64; 3] = [0.5, 0.5, 0.5];
+
+#[derive(Debug, Clone, Default)]
+pub struct MyModelProcessor;
+
+impl MyModelProcessor {
+    pub fn new() -> Self { Self }
+}
+
+impl ImagePreProcessor for MyModelProcessor {
+    fn default_mean(&self) -> [f64; 3] { MYMODEL_MEAN }
+    fn default_std(&self) -> [f64; 3] { MYMODEL_STD }
+
+    fn preprocess(
+        &self,
+        images: &[DynamicImage],
+        config: &PreProcessorConfig,
+    ) -> Result<PreprocessedImages, TransformError> {
+        // resize -> normalize with default_mean()/default_std() -> stack into Array4<f32>
+        // num_img_tokens[i] = calculate_num_tokens(w, h, config)
+        // image_sizes[i] = (orig_w, orig_h)
+        todo!("build pixel_values, then PreprocessedImages::new(pixel_values, num_img_tokens, image_sizes)")
+    }
+
+    fn calculate_num_tokens(&self, width: u32, height: u32, config: &PreProcessorConfig) -> usize {
+        todo!("tokens this image expands to, e.g. (h/patch)*(w/patch)")
+    }
+
+    fn model_name(&self) -> &'static str { "mymodel" }
 }
 ```
 
-## Key Rules
+**Verify:** `cargo test -p llm-multimodal vision::processors::mymodel`
 
-- Track all media with UUIDs for deduplication and caching
-- Domain whitelisting on URL fetches
-- Timeout handling on all external fetches
-- Use fixture images for tests, NPZ comparison for processor validation
+**Anti-pattern:** Hardcoding mean/std/patch_size in `preprocess` instead of reading `config` (`PreProcessorConfig::get_target_size`, `get_patch_size`). The HF preprocessor config must win when present.
+
+### Step 2: Export the processor
+
+**File:** `crates/multimodal/src/vision/processors/mod.rs`
+
+```rust
+pub mod mymodel;
+pub use mymodel::MyModelProcessor;
+```
+
+Then add it to `ImageProcessorRegistry::with_defaults()` in `vision/image_processor.rs`, registering every lowercase id substring the model uses (matching is case-insensitive `contains`):
+
+```rust
+registry.register("mymodel", Box::new(super::processors::MyModelProcessor::new()));
+```
+
+**Verify:** `cargo test -p llm-multimodal vision::image_processor::tests::test_registry_with_defaults`
+
+**Anti-pattern:** Registering a broad pattern (e.g. `"my"`) that also matches another model id. Register the most specific spec BEFORE more general ones (see how `qwen3-vl` precedes `qwen2-vl`).
+
+### Step 3: Implement the spec
+
+Implement `ModelProcessorSpec` (`registry/traits.rs`). `matches` is keyed by `ModelMetadata { model_id, tokenizer, config }`; pull token ids from `metadata.token_id(...)` or `metadata.config_u32(&["image_token_id"])`. `prompt_replacements` builds one `PromptReplacement` per image, expanding the placeholder to `num_img_tokens` copies.
+
+**File:** `crates/multimodal/src/registry/mymodel.rs`
+
+```rust
+use std::collections::HashMap;
+use serde_json::{json, Value};
+use crate::{
+    registry::{ModelMetadata, ModelProcessorSpec, RegistryResult},
+    types::{Modality, PromptReplacement, TokenId},
+    vision::image_processor::PreprocessedImages,
+};
+
+pub(super) struct MyModelSpec;
+
+impl ModelProcessorSpec for MyModelSpec {
+    fn name(&self) -> &'static str { "mymodel" }
+
+    fn matches(&self, metadata: &ModelMetadata) -> bool {
+        let id = metadata.model_id.to_ascii_lowercase();
+        id.contains("mymodel")
+            || metadata.config_model_type().is_some_and(|mt| mt == "mymodel")
+    }
+
+    fn placeholder_token(&self, _metadata: &ModelMetadata) -> RegistryResult<String> {
+        Ok("<|image|>".to_owned())
+    }
+
+    fn placeholder_token_id(&self, metadata: &ModelMetadata) -> RegistryResult<TokenId> {
+        metadata.token_id("<|image|>")
+    }
+
+    fn modality_limits(&self, _m: &ModelMetadata) -> RegistryResult<HashMap<Modality, usize>> {
+        Ok(HashMap::from([(Modality::Image, 4)]))
+    }
+
+    fn processor_kwargs(&self, _m: &ModelMetadata) -> RegistryResult<Value> {
+        Ok(json!({}))
+    }
+
+    fn prompt_replacements(
+        &self,
+        metadata: &ModelMetadata,
+        preprocessed: &PreprocessedImages,
+    ) -> RegistryResult<Vec<PromptReplacement>> {
+        let token_id = self.placeholder_token_id(metadata)?;
+        let token = self.placeholder_token(metadata)?;
+        Ok(preprocessed
+            .num_img_tokens
+            .iter()
+            .map(|&count| PromptReplacement::repeated(Modality::Image, &token, token_id, count))
+            .collect())
+    }
+}
+```
+
+**Verify:** `cargo test -p llm-multimodal registry::mymodel`
+
+**Anti-pattern:** Hand-counting placeholder tokens. Drive `prompt_replacements` off `preprocessed.num_img_tokens` so the count always matches the tensors the processor emitted.
+
+### Step 4: Register the spec
+
+**File:** `crates/multimodal/src/registry/mod.rs`
+
+Add `mod mymodel;`, `use mymodel::MyModelSpec;`, and a `LazySpec` entry in `ModelRegistry::new()` (order it before any more-general spec it could collide with):
+
+```rust
+LazySpec::new("mymodel", || Box::new(MyModelSpec)),
+```
+
+**Verify:** `cargo test -p llm-multimodal`
+
+**Anti-pattern:** Adding the `mod`/`use` but forgetting the `LazySpec` entry, so `ModelRegistry::lookup` never returns the spec.
+
+### Step 5: Quality gate
+
+Invoke `smg:contribute` to run fmt -> clippy -> test -> bindings.
+
+## Critical Rules
+
+- Verify against `crates/multimodal/src/lib.rs` exports: content type is `MediaContentPart` (not `ChatContentPart`); the tracker yields `TrackerOutput`, not any `MultiModalInputs`.
+- `field_layouts` defaults to `pixel_values: Batched`. Override it (like `qwen3_vl.rs`) only for patchified/flat tensors, declaring the sizes tensor via `FieldLayout::flat("patches_per_image")`.
+- Use `new_dynamic` for 5D `pixel_values`; the `channels`/`height`/`width` accessors error on non-4D/5D shapes.
+- Registry lookups are substring `contains` (processors) / `matches` (specs) — register specific patterns before general ones in both registries.
+- All media flows through `MediaConnector`: honor `MediaConnectorConfig` (allowed_domains, `fetch_timeout` default 10s); images are Blake3-hashed (`hasher.rs`) for dedup.

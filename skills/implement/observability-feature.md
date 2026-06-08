@@ -32,24 +32,25 @@ bool_to_static_str(true)        // → "true"
 
 ### Step 3: Verify exposure
 
-Metrics exposed via Prometheus `/metrics` endpoint.
+Metrics exposed via Prometheus `/metrics` endpoint (served on port **29000** by default, set via `--prometheus-port`).
 
-**Verify:** `curl localhost:9090/metrics | grep my_metric`
+**Verify:** `curl localhost:29000/metrics | grep my_metric`
 
 ## Adding Tracing
 
-```rust
-use tracing::{instrument, Span};
+The codebase records fields on the current span manually — it does NOT use `#[instrument]`, and `tracing::Span` has no `set_attribute` (that is OTel-only). See `model_gateway/src/middleware/logging.rs`.
 
-#[instrument(skip_all, fields(request_id = %req.id))]
-async fn handle_request(req: &Request) {
-    let span = Span::current();
-    span.set_attribute("model_id", req.model_id.clone());
-}
+```rust
+use tracing::Span;
+
+let span = Span::current();
+// Fields must be declared (as Empty) when the span is created, then filled in:
+span.record("model_id", req.model_id.as_str());
+span.record("worker_url", url.as_str());
 ```
 
-- Propagate trace context through gRPC metadata (see @grpc-backend.md)
-- Configure exporter: Jaeger, Zipkin, or OTLP
+- OTel context is bridged in `model_gateway/src/observability/otel_trace.rs`; trace context propagates through gRPC metadata (see @grpc-backend.md)
+- Real-time metrics are also pushed over a WebSocket (`observability/metrics_ws/`)
 
 ## Logging Rules
 

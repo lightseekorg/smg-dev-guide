@@ -9,7 +9,7 @@ Radix trees for cache-aware routing. Tracks which workers have which prompt pref
 | `StringTree` | `&str` (characters) | HTTP routing — prompt text prefix matching |
 | `TokenTree` | `&[u32]` (token IDs) | gRPC routing — token sequence prefix matching |
 
-Both implement `RadixTree` trait: prefix insertion, longest-prefix-match, LRU eviction, concurrent access (DashMap-based).
+Both implement the `RadixTree` trait: prefix insertion, longest-prefix-match (`prefix_match`/`prefix_match_with_counts`), per-tenant eviction (`evict(tenant, max_units)`), concurrent access (`DashMap` **and** `parking_lot::RwLock`).
 
 ## Steps
 
@@ -41,7 +41,7 @@ Configurable interval (`cache_aware.eviction_interval_secs`). Entries not access
 
 ## Key Rules
 
-- All state must be `Send + Sync` (DashMap, not RwLock)
+- All state must be `Send + Sync` — the trees use both `DashMap` and `parking_lot::RwLock`
 - Support both String and Token variants for HTTP/gRPC dual mode
 - Always add eviction — unbounded trees cause OOM
 - Test concurrent access from multiple routing tasks

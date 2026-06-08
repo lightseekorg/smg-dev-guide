@@ -1,85 +1,128 @@
-# Adding a WASM Plugin Feature to SMG
+# Adding a WASM Plugin (Guest) to SMG
 
-Wasmtime component model with WIT interface. Plugins intercept requests/responses.
+Plugins are WebAssembly components run by Wasmtime against the WIT world `smg` (`crates/wasm/src/interface/spec.wit`, `package smg:gateway;`). A middleware guest exports two interfaces — `middleware-on-request` and `middleware-on-response` — each returning an `action`. The host loads the component, attaches it at a hook, and runs it inside memory/time limits.
 
-## Attachment Points
+Most "plugins" are new **guests** in `examples/wasm/` against the existing world. You only touch the host crate (`smg-wasm`) when adding a new hook or changing the WIT.
 
-| Hook | When | Use Case |
-|------|------|----------|
-| `OnRequest` | Before routing | Auth, rate limiting, request modification |
-| `OnResponse` | After backend response | Logging, response modification |
+## Attachment points (`MiddlewareAttachPoint`, `crates/wasm/src/module.rs`)
 
-## Actions
+| Variant | When | Typical use |
+|---------|------|-------------|
+| `OnRequest` | Before routing | Auth, rate limiting, request rewrite |
+| `OnResponse` | After backend response | Logging, response rewrite |
+| `OnError` | On error path | Error shaping |
+
+## Actions (`action` variant in `spec.wit`)
 
 | Action | Effect |
 |--------|--------|
 | `Continue` | Pass through unchanged |
-| `Reject(status)` | Block request with HTTP status |
-| `Modify(changes)` | Modify headers/body/status |
+| `Reject(u16)` | Block with that HTTP status |
+| `Modify(ModifyAction)` | Set/add/remove headers, replace body, override status |
 
-## Steps
+## Steps (new middleware guest — the common case)
 
-### Step 1: Define types in WIT (if new interface needed)
+### Step 1: Scaffold the guest crate
 
-**File:** `crates/wasm/src/interface/spec.wit`
+**Dir:** `examples/wasm/wasm-guest-{name}/`. Model this on `examples/wasm/wasm-guest-auth/` (on-request only) or `wasm-guest-logging/` (on-request + on-response with `Modify`).
 
-```wit
-interface middleware-types {
-  record request { method, path, query, headers, body, request-id, now-epoch-ms }
-  record response { status, headers, body }
-  variant action { continue, reject(u16), modify(modify-action) }
-}
+`Cargo.toml`:
+
+```toml
+[package]
+name = "wasm-guest-myplugin"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wit-bindgen = { version = "0.21", features = ["macros"] }
 ```
 
-### Step 2: Add attachment point (if new hook)
+### Step 2: Implement both export interfaces
 
-**File:** `crates/wasm/src/module.rs`
-
-Add to `MiddlewareAttachPoint` enum.
-
-### Step 3: Implement handler matching
-
-**File:** `crates/wasm/src/runtime.rs`
-
-Match the new attachment point and execute WASM module.
-
-### Step 4: Update module validation
-
-**File:** `crates/wasm/src/module_manager.rs`
-
-### Step 5: Write example guest plugin
-
-**Directory:** `crates/wasm/examples/`
+**File:** `examples/wasm/wasm-guest-{name}/src/lib.rs`. The `path` arg is REQUIRED — it points at the host crate's WIT dir.
 
 ```rust
-wit_bindgen::generate!({ world: "smg" });
+wit_bindgen::generate!({
+    path: "../../../crates/wasm/src/interface",
+    world: "smg",
+});
 
-struct MyPlugin;
-impl Guest for MyPlugin {
-    fn middleware_on_request(req: Request) -> Action {
-        // Plugin logic
-        Action::Continue
-    }
-    fn middleware_on_response(_req: Request, _resp: Response) -> Action {
-        Action::Continue
-    }
+use exports::smg::gateway::{
+    middleware_on_request::Guest as OnRequestGuest,
+    middleware_on_response::Guest as OnResponseGuest,
+};
+use smg::gateway::middleware_types::{Action, Request, Response};
+
+struct Middleware;
+
+// req: method, path, query, headers (list<header>), body (list<u8>), request_id, now_epoch_ms
+impl OnRequestGuest for Middleware {
+    fn on_request(req: Request) -> Action { Action::Continue }
 }
-export!(MyPlugin);
+
+// resp: status, headers, body — NO request param
+impl OnResponseGuest for Middleware {
+    fn on_response(_resp: Response) -> Action { Action::Continue }
+}
+
+export!(Middleware);
 ```
 
-### Step 6: Write tests
+You MUST implement both traits even if a hook is a no-op; the world exports both. For `Modify`, build a `ModifyAction { status, headers_set, headers_add, headers_remove, body_replace }` (see `wasm-guest-logging`).
 
-- Module upload via `/admin/wasm` API
-- Execution at attachment point
-- Each action variant (Continue, Reject, Modify)
-- Memory limits (64MB) and timeouts (1s)
+### Step 3: Build the component
 
-**Verify:** `cargo test`
+Target `wasm32-wasip2`, then wrap into a component. Copy `build.sh` from `wasm-guest-auth/` (handles target install + `wasm-tools component new`):
 
-## Key Rules
+```bash
+cargo build --target wasm32-wasip2 --release
+wasm-tools component new \
+  target/wasm32-wasip2/release/wasm_guest_myplugin.wasm \
+  -o target/wasm32-wasip2/release/wasm_guest_myplugin.component.wasm
+```
 
-- Modules uploaded via admin API (requires Admin role)
-- SHA-256 integrity verification on upload
-- Memory limit: 64MB, timeout: 1s
-- LRU component cache per worker thread
-- `storage-hooks` feature flag for database interceptors
+### Step 4: Upload via the admin API
+
+Routes live on the admin router (control-plane / API-key auth) but the URL has **no** `/admin` prefix — `POST /wasm`, `GET /wasm`, `DELETE /wasm/{module_uuid}` (`model_gateway/src/server.rs`). Run SMG with `--enable-wasm`. The host rejects a duplicate by SHA-256 (`check_duplicate_sha256_hash`, `module_manager.rs`).
+
+```bash
+curl -X POST http://localhost:3000/wasm -H 'Content-Type: application/json' -d '{
+  "modules": [{
+    "name": "myplugin",
+    "file_path": "/abs/path/wasm_guest_myplugin.component.wasm",
+    "module_type": "Middleware",
+    "attach_points": [{"Middleware": "OnRequest"}, {"Middleware": "OnResponse"}]
+  }]
+}'
+```
+
+Modules execute in upload order; a `Reject` short-circuits the rest.
+
+## Adding a NEW hook or changing the WIT (host crate)
+
+Only when the existing world is insufficient:
+
+1. Edit `crates/wasm/src/interface/spec.wit` (types/interfaces/world).
+2. Host bindings regenerate via `wasmtime::component::bindgen!` in `crates/wasm/src/spec.rs` (`path: "src/interface"`, `world: "smg"`).
+3. Extend `MiddlewareAttachPoint` in `crates/wasm/src/module.rs` and its handling in `module_manager.rs`.
+4. Tune limits in `crates/wasm/src/config.rs` (`WasmRuntimeConfig`).
+
+## Storage hooks are a SEPARATE world
+
+DB-layer interception is a different WIT world: `crates/wasm/src/interface/storage/storage-hooks.wit` (`package smg:storage; world storage-hook`, exports `storage-hook-before` + `storage-hook-after`), bridged by `WasmStorageHook` (`crates/wasm/src/storage_hook.rs`) and gated by the `storage-hooks` cargo feature. Model a storage guest on `examples/wasm/wasm-guest-storage-hook/` — note its `generate!` uses `path: ".../interface/storage", world: "storage-hook"`, not the gateway world.
+
+## Step: Quality gate
+
+Invoke `smg:contribute` to run fmt -> clippy -> test -> bindings -> commit.
+
+## Critical Rules
+
+- Two traits, exact method names: `on_request(req)` and `on_response(resp)`. `on_response` takes ONLY `resp`. There is no single `Guest` trait.
+- `generate!` and `bindgen!` both need the `path` arg; omitting it on the guest fails to find the WIT.
+- Default limits: `max_memory_pages: 1024` (= 64MB), `max_execution_time_ms: 1000`, plus `max_body_size: 10MB` (`config.rs` `Default`). A guest exceeding them is killed.
+- Upload URL is `/wasm`, not `/admin/wasm`, despite living on the admin router.
+- WIT identifiers are kebab-case; generated Rust is snake_case (`now-epoch-ms` -> `now_epoch_ms`) and PascalCase types (`modify-action` -> `ModifyAction`).

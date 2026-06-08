@@ -67,12 +67,10 @@ fn to_server_config(...) -> ServerConfig {
 
 **File:** `bindings/python/src/lib.rs`
 
-1. Add parameter to `Router.__init__()`: `my_field: Option<String> = None`
-2. Search file for ALL struct literals of the config type you modified
-3. Add `my_field: None` to each literal
+The `Router` constructor is `#[new]` with a flat `#[pyo3(signature = (...))]`, and `RouterConfig` is assembled via `RouterConfig::builder()` in `to_router_config()` — there is NO `RouterConfig` struct literal. Append `my_field` to the signature, store it on the `Router` pyclass, thread it through the builder chain, and mirror it in `src/smg/router_args.py`. Full procedure: @bindings-update.md.
 
 **Verify:** `make python-dev`
-**Anti-pattern:** Missing one struct literal — build fails with inscrutable error about missing field.
+**Anti-pattern:** Grepping for a `RouterConfig {` literal — none exists; add the field to the `builder()` chain instead.
 
 ### Step 6: Update Go SDK (if exposed)
 
@@ -95,4 +93,4 @@ fn to_server_config(...) -> ServerConfig {
 | Only wiring `to_router_config()` | Config file value silently ignored | Always grep for BOTH functions |
 | Missing `#[serde(default)]` | Existing configs break on deserialize | Every `Option<T>` field needs it |
 | String instead of typed enum at runtime | Re-parsing on every request | Parse at boundary, store typed |
-| Missing Python struct literal | `maturin develop` build failure | Search for ALL occurrences of struct name |
+| Looking for a `RouterConfig {` literal | None exists — it's `builder()...build()` | Add to the builder chain + `router_args.py` (see @bindings-update.md) |
