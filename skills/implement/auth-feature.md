@@ -6,7 +6,7 @@ Two-factor auth: API key (SHA-256) + JWT/OIDC. Roles: Admin (control plane) and 
 
 ### Adding a New Role
 
-1. Extend `Role` enum in `crates/auth/src/`
+1. Extend `Role` enum in `crates/auth/src/config.rs`
 2. Update permission checks in middleware
 3. Update role mapping for JWT claims
 4. Add audit logging for new role actions
@@ -14,7 +14,7 @@ Two-factor auth: API key (SHA-256) + JWT/OIDC. Roles: Admin (control plane) and 
 ### Adding a New OIDC Provider
 
 1. Configure `JwtConfig` with provider's JWKS URI
-2. Set `role_claim` to match provider's claim name (default: `"role"`)
+2. Set `role_claim` to match provider's claim name (default: `"roles"`)
 3. Map IDP roles to gateway roles via `role_mapping`:
    ```rust
    role_mapping: HashMap::from([
@@ -27,8 +27,8 @@ Two-factor auth: API key (SHA-256) + JWT/OIDC. Roles: Admin (control plane) and 
 ### Adding a Custom Auth Method
 
 1. Implement validation logic in `crates/auth/src/`
-2. Extract `Principal` from request
-3. Integrate in middleware chain (`/admin/*` routes)
+2. Extract `Principal` from request (via `PrincipalExt`, `crates/auth/src/middleware.rs`)
+3. Integrate via `control_plane_auth_middleware` on the merged `admin_routes` router (control-plane endpoints like `/wasm`, `/parse/*` — there is no literal `/admin` URL prefix)
 4. Add audit event for the new method
 
 ### JWT Flow (7 Steps)
@@ -43,9 +43,10 @@ Two-factor auth: API key (SHA-256) + JWT/OIDC. Roles: Admin (control plane) and 
 
 ## Audit Events
 
-All control plane mutations must be logged:
+All control plane mutations must be logged. Emit via `AuditLogger` (`log_success` / `log_denied` / `log_auth_failure`) — don't construct `AuditEvent` by hand:
 ```rust
-AuditEvent { timestamp, request_id, principal_id, operation, resource, outcome }
+// AuditEvent fields (audit.rs): timestamp, principal, auth_method, role,
+//   method, path, resource, outcome (Success | Denied), request_id, details
 ```
 
 ## Key Rules

@@ -63,24 +63,7 @@ These are real, actively-developed subsystems that don't yet have a step-by-step
 
 **If none match:** This is a novel change. Read the codebase architecture with `smg:map` first, then follow the general pattern: implement → test → verify → chain to `smg:contribute`.
 
-## Recipe Freshness (audited 2026-06)
-
-The codebase moved faster than several recipes. Until each is rewritten, **verify trait/type names and file paths against the code before following a recipe** — some templates below will not compile as written. Known major drift:
-
-| Recipe | Key correction (verify against code) |
-|--------|--------------------------------------|
-| @routing-policy.md | Trait is `LoadBalancingPolicy` (sync, returns `Option<usize>`), not `RoutingPolicy`; `SelectWorkerInfo` is a struct (`.tokens`/`.request_text`), not an enum; policies live in `model_gateway/src/policies/` |
-| @grpc-backend.md | Per-engine files (`sglang_scheduler.rs`, …) with clients like `SglangSchedulerClient`; trace injection via the `TraceInjector` trait; runtime detection is `workflow/steps/local/detect_backend.rs` |
-| @mesh-feature.md | File listing is obsolete; CRDT lives in `crates/mesh/src/crdt_kv/` (watermark/ack + operation log); node states are INIT/ALIVE/SUSPECTED/DOWN/LEAVING |
-| @bindings-update.md | Python uses `#[new]` + `RouterConfig::builder()` (not `__init__` + struct literals); Go cgo bridge in `bindings/golang/internal/ffi/*.go`, Rust FFI in `bindings/golang/src/*.rs` |
-| @tool-parser.md | Stale format tokens (MiniMax/Step3/Kimi) and a non-existent helper in the template; the Qwen parser file is `qwen_xml.rs` |
-| @reasoning-parser.md | `ParserConfig` field is `always_in_reasoning`; trait also requires `mark_reasoning_started` + `mark_think_start_stripped`; default buffer is 4 MB (template won't compile as written) |
-| @multimodal-feature.md | Content type is `MediaContentPart` (not `ChatContentPart`); `MultiModalInputs` is gone; crate is `llm-multimodal` with ~9 vision processors |
-| @wasm-plugin.md | Guests live in repo-root `examples/wasm/`; implement `OnRequestGuest`/`OnResponseGuest` (`on_request`/`on_response`, no `req` on response); upload route is `/wasm` |
-| @mcp-feature.md | `transform/` dir removed (logic moved to `model_gateway::routers::common::openai_bridge`); transports are `McpTransport` enum variants; test attr is `#[serial]` |
-| @storage-backend.md | No single `StorageBackend` trait — implement `ConversationStorage` + `ConversationItemStorage` + `ResponseStorage`; backends are flat `.rs` files; hooks via `Hooked*` decorators in `factory.rs` |
-
-**Minor drift** (mostly correct, small fixes pending): config-plumbing.md (Python step uses the builder, not struct literals), auth-feature.md (`role_claim` default is `"roles"`; `AuditEvent` field set differs), discovery-feature.md (steps are a DAG under `workflow/steps/local/`), kv-index-feature.md (uses DashMap **and** RwLock), observability-feature.md (metrics port is 29000; codebase uses manual `span.record`, not `#[instrument]`).
+All recipes were rewritten and verified against the codebase (2026-06). They reflect current trait/type names and paths; still run each recipe's `cargo check`/`cargo test` step as you go.
 
 ## Process
 
