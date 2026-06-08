@@ -44,7 +44,7 @@ worker_spec.labels.insert("my_key".to_string(), extracted_value);
 
 ### Step 3: Consume in worker creation (if needed)
 
-**File:** `model_gateway/src/core/steps/worker/local/create_worker.rs`
+**File:** `model_gateway/src/workflow/steps/local/create_worker.rs`
 
 Read from merged labels in Step 5:
 ```rust

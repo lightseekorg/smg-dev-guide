@@ -6,7 +6,7 @@ All routing state must be `Send + Sync`. Must handle both HTTP and gRPC paths.
 
 ### Step 1: Create policy file
 
-**File:** `model_gateway/src/core/routing/my_policy.rs`
+**File:** `model_gateway/src/policies/my_policy.rs`
 
 ```rust
 use async_trait::async_trait;
@@ -23,7 +23,7 @@ impl RoutingPolicy for MyPolicy {
         info: &SelectWorkerInfo,
     ) -> Option<Arc<dyn Worker>> {
         let available: Vec<_> = workers.iter()
-            .filter(|w| w.is_healthy() && w.circuit_breaker().can_execute())
+            .filter(|w| w.is_healthy() && w.circuit_breaker_can_execute())
             .collect();
         if available.is_empty() {
             return None;
@@ -42,7 +42,7 @@ impl RoutingPolicy for MyPolicy {
 
 ### Step 2: Register in factory
 
-**File:** `model_gateway/src/core/routing/` (factory module)
+**File:** `model_gateway/src/policies/factory.rs`
 
 Add enum variant and factory match arm.
 
@@ -65,7 +65,7 @@ Follow @config-plumbing.md for policy-specific parameters.
 ## Critical Rules
 
 - **Never** `.unwrap()` on worker access
-- **Always** filter `is_healthy() && circuit_breaker().can_execute()` before selection
+- **Always** filter `is_healthy() && circuit_breaker_can_execute()` before selection
 - **Always** handle both `SelectWorkerInfo` variants
 - Use `DashMap` for concurrent state, not `RwLock`
 - Use `Arc::clone()` from the slice, never clone workers

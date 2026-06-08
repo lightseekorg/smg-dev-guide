@@ -24,13 +24,13 @@ inject_trace_context(request.metadata_mut());
 
 ### Step 3: Register in runtime detection
 
-**File:** `model_gateway/src/core/steps/worker/local/detect_runtime.rs`
+**File:** `model_gateway/src/workflow/steps/local/detect_backend.rs`
 
-Add detection logic so the 5-step worker lifecycle recognizes this backend.
+Add detection logic so the worker-discovery DAG recognizes this backend.
 
 ### Step 4: Add metadata discovery
 
-**File:** `model_gateway/src/core/steps/worker/local/discover_metadata.rs`
+**File:** `model_gateway/src/workflow/steps/local/discover_metadata.rs`
 
 Map backend-specific fields to standard label keys:
 ```rust
