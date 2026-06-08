@@ -98,7 +98,7 @@ Unlike passive reference docs, these skills **enforce workflows**:
 - **Hard Gates** block progression without prerequisites (e.g. must identify touched subsystems before reviewing)
 - **Rationalization Tables** counter common excuses for cutting corners
 - **Skill Chaining** ensures `implement` → `contribute` → `review-pr` flow
-- **15 Implementation Recipes** provide step-by-step guidance with exact file paths, code patterns, and verification commands for every subsystem
+- **20 Implementation Recipes** provide step-by-step guidance with exact file paths, code patterns, and verification commands for every subsystem
 
 ## Implementation Recipes
 
@@ -121,6 +121,11 @@ Unlike passive reference docs, these skills **enforce workflows**:
 | mcp-feature | MCP protocol, tool execution |
 | kv-index-feature | Radix trees, cache-aware routing |
 | multimodal-feature | Vision processors, media pipeline |
+| scheduler-feature | Priority admission: classes, queues, reservations, preemption |
+| tenancy-feature | Multi-tenant identity, tenant resolution, per-tenant state |
+| rate-limit-feature | Token-bucket rate limiting + concurrency caps |
+| memory-feature | Conversation/request memory policy + execution context |
+| provider-api | Provider-compatible API routers (Anthropic, Gemini) |
 
 ## Directory Structure
 
@@ -133,7 +138,7 @@ skills/                  # Skill source files
   map/SKILL.md
   contribute/SKILL.md
   review-pr/SKILL.md
-  implement/SKILL.md     # + 15 recipe files
+  implement/SKILL.md     # + 20 recipe files
 commands/                # Claude Code /smg command router
   smg.md
 ```
