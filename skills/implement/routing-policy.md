@@ -1,71 +1,120 @@
 # Adding a Routing Policy to SMG
 
-All routing state must be `Send + Sync`. Must handle both HTTP and gRPC paths.
+A routing policy implements `LoadBalancingPolicy` (`model_gateway/src/policies/mod.rs`): a **synchronous** `Send + Sync + Debug` trait whose `select_worker` returns the **index** of the chosen worker (`Option<usize>`), not the worker itself. Live in `model_gateway/src/policies/`, registered via `PolicyConfig` + `PolicyFactory`, owned at runtime by `PolicyRegistry`.
+
+Note: `dp_min_token.rs` implements a *different* trait, `DPRankLoadPolicy` (selects a DP rank within one worker, not a worker). If you need that, don't follow this recipe.
+
+## Inputs to gather first
+
+| Input | Example | Notes |
+|-------|---------|-------|
+| `POLICY_NAME` | `least_loaded` | Snake case. File name, `name()` return, factory key |
+| Struct name | `LeastLoadedPolicy` | PascalCase + `Policy` suffix |
+| State | `AtomicUsize`, `RwLock<HashMap<..>>`, none | Must be `Send + Sync`. Stateless policies are unit structs (see `random.rs`) |
+| Routing input | none / `info.tokens` / `info.request_text` / `info.headers` | What drives selection (see Critical Rules) |
+| Config params | `load_factor: f64` | If tunable, needs a `PolicyConfig` variant — see @config-plumbing.md |
 
 ## Steps
 
-### Step 1: Create policy file
+### Step 1: Create the policy file
 
-**File:** `model_gateway/src/policies/my_policy.rs`
+**File:** `model_gateway/src/policies/{POLICY_NAME}.rs`
+
+Model this on `random.rs` (stateless) or `power_of_two.rs` (cached load state). Required methods: `select_worker`, `name`, `as_any`. Default methods you may override: `on_request_complete`, `needs_request_text`, `update_loads`, `reset`. Always filter via the `get_healthy_worker_indices` helper — it applies `is_healthy() && circuit_breaker_can_execute()` per worker.
 
 ```rust
-use async_trait::async_trait;
+use std::sync::Arc;
 
-pub struct MyPolicy {
-    // State must be Send + Sync (use DashMap, AtomicUsize, Arc)
+use super::{get_healthy_worker_indices, LoadBalancingPolicy, SelectWorkerInfo};
+use crate::worker::Worker;
+
+#[derive(Debug, Default)]
+pub struct LeastLoadedPolicy;
+
+impl LeastLoadedPolicy {
+    pub fn new() -> Self {
+        Self
+    }
 }
 
-#[async_trait]
-impl RoutingPolicy for MyPolicy {
-    async fn select_worker(
+impl LoadBalancingPolicy for LeastLoadedPolicy {
+    fn select_worker(
         &self,
         workers: &[Arc<dyn Worker>],
-        info: &SelectWorkerInfo,
-    ) -> Option<Arc<dyn Worker>> {
-        let available: Vec<_> = workers.iter()
-            .filter(|w| w.is_healthy() && w.circuit_breaker_can_execute())
-            .collect();
-        if available.is_empty() {
+        _info: &SelectWorkerInfo,
+    ) -> Option<usize> {
+        let healthy_indices = get_healthy_worker_indices(workers);
+        if healthy_indices.is_empty() {
             return None;
         }
-        // Selection logic here — handle BOTH variants:
-        match info {
-            SelectWorkerInfo::Http { prompt, .. } => { /* string-based */ }
-            SelectWorkerInfo::Grpc { token_ids, .. } => { /* token-based */ }
-        }
+
+        // Return an INDEX into `workers`, never an Arc<dyn Worker>.
+        healthy_indices
+            .into_iter()
+            .min_by_key(|&idx| workers[idx].load())
+    }
+
+    fn name(&self) -> &'static str {
+        "least_loaded"
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 ```
 
-**Verify:** `cargo build`
-**Anti-pattern:** Using `.unwrap()` on empty worker slice — panics in production. Using `RwLock` on hot path — contention under load.
+**Verify:** `cargo check -p smg`
 
-### Step 2: Register in factory
+**Anti-pattern:** Adding `#[async_trait]` / `async fn`, or returning `Option<Arc<dyn Worker>>`. The trait is sync and returns `Option<usize>` — both fail to compile. Also: hand-rolling `w.circuit_breaker().can_execute()`. The method is `w.circuit_breaker_can_execute()`; just use `get_healthy_worker_indices`.
 
-**File:** `model_gateway/src/policies/factory.rs`
+### Step 2: Export the policy
 
-Add enum variant and factory match arm.
+**File:** `model_gateway/src/policies/mod.rs` — add `mod {POLICY_NAME};` to the module block and `pub use {POLICY_NAME}::LeastLoadedPolicy;` to the re-exports.
 
-**Verify:** `cargo build`
+**Verify:** `cargo check -p smg`
 
-### Step 3: Add config (if needed)
+### Step 3: Add a config variant
 
-Follow @config-plumbing.md for policy-specific parameters.
+**File:** `model_gateway/src/config/types.rs` — add a variant to the `PolicyConfig` enum (with a `#[serde(rename = "least_loaded")]`), and a match arm in `PolicyConfig::name()`.
 
-### Step 4: Write tests
+```rust
+#[serde(rename = "least_loaded")]
+LeastLoaded,
+```
 
-- Empty worker slice → returns `None`
-- All workers unhealthy → returns `None`
-- Both `SelectWorkerInfo::Http` and `SelectWorkerInfo::Grpc` paths
-- Concurrent access (spawn multiple tasks calling `select_worker`)
+Stateless policies are fieldless like `Random`/`RoundRobin`. For tunables, give the variant fields (`#[serde(default = "...")]`) and plumb them per @config-plumbing.md.
 
-**Verify:** `cargo test`
-**Anti-pattern:** Only testing HTTP path — gRPC breaks silently.
+**Verify:** `cargo check -p smg`
+
+### Step 4: Register in the factory
+
+**File:** `model_gateway/src/policies/factory.rs` — add `LeastLoadedPolicy` to the `use super::{...}` list, then add a match arm to **both** functions:
+
+```rust
+// in create_from_config(config: &PolicyConfig)
+PolicyConfig::LeastLoaded => Arc::new(LeastLoadedPolicy::new()),
+
+// in create_by_name(name: &str)  -- matched lowercased
+"least_loaded" | "leastloaded" => Some(Arc::new(LeastLoadedPolicy::new())),
+```
+
+`PolicyRegistry` (`policies/registry.rs`) calls these to build the default/prefill/decode/per-model policies, so both arms are required: `create_from_config` for the configured policy, `create_by_name` for per-worker policy hints.
+
+**Verify:** `cargo test -p smg`
+
+**Anti-pattern:** Updating only `create_from_config`. A worker that sends a `policy_hint` routes through `create_by_name`, which would silently fall back to the default policy on a miss.
+
+### Step 5: Quality gate
+
+Invoke `smg:contribute` to run fmt -> clippy -> test -> bindings -> commit.
 
 ## Critical Rules
 
-- **Never** `.unwrap()` on worker access
-- **Always** filter `is_healthy() && circuit_breaker_can_execute()` before selection
-- **Always** handle both `SelectWorkerInfo` variants
-- Use `DashMap` for concurrent state, not `RwLock`
-- Use `Arc::clone()` from the slice, never clone workers
+- The trait is `LoadBalancingPolicy`, sync, `Send + Sync + Debug`. No `#[async_trait]`. `select_worker` returns `Option<usize>` (index into the `workers` slice).
+- Always filter with `get_healthy_worker_indices(workers)` and return `None` when it is empty. Index back into `workers` to read load/url or call `increment_processed()`.
+- `SelectWorkerInfo` is a **struct**, not an enum — there are no `Http`/`Grpc` variants. Branch on its fields: `info.tokens: Option<&[u32]>` (token path) vs `info.request_text: Option<&str>` (text path); `cache_aware.rs::select_worker` does exactly this. If your policy reads request text/tokens, override `needs_request_text()` to return `true`.
+- Header-based routing reads `info.headers: Option<&http::HeaderMap>` (e.g. `X-SMG-Target-Worker`, `X-SMG-Routing-Key`); consistent-hash policies use the prebuilt `info.hash_ring: Option<Arc<HashRing>>` rather than rebuilding per request.
+- State must be `Send + Sync`. Prefer `AtomicUsize` (round_robin) or `DashMap`; `power_of_two.rs` uses `RwLock<HashMap<..>>` for cached loads updated via `update_loads`. Never `.unwrap()` on worker access or hold a lock across `select_worker`.
+- Load-aware policies (those overriding `update_loads`) are fed by the registry only if discoverable — `power_of_two` is gathered by name via `get_all_power_of_two_policies()`; a new load-aware policy needs an equivalent hook to receive load updates.
+- There are 8 `LoadBalancingPolicy` impls (random, round_robin, power_of_two, cache_aware, bucket, manual, consistent_hashing, prefix_hash). Match an existing one rather than inventing API.
