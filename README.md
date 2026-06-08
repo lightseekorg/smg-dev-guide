@@ -35,9 +35,21 @@ gemini skills install https://github.com/lightseekorg/smg-dev-guide.git --scope 
 
 ### Claude Code
 
+From the shell:
+
 ```bash
-claude marketplace add lightseekorg/smg-dev-guide
+claude plugin marketplace add lightseekorg/smg-dev-guide
+claude plugin install smg@smg-dev-guide
 ```
+
+Or inside Claude Code:
+
+```
+/plugin marketplace add lightseekorg/smg-dev-guide
+/plugin install smg@smg-dev-guide
+```
+
+Run `/reload-plugins` (or restart Claude Code) to load the skills.
 
 ### Codex
 
