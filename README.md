@@ -108,8 +108,8 @@ Unlike passive reference docs, these skills **enforce workflows**:
 |--------|-----------|
 | config-plumbing | CLI flags, config fields, the critical two-path rule |
 | routing-policy | Load balancing, dual HTTP/gRPC mode |
-| tool-parser | Tool/function call formats (13+) |
-| reasoning-parser | Reasoning extraction (10+ model families) |
+| tool-parser | Tool/function call formats (14) |
+| reasoning-parser | Reasoning extraction (8 model families) |
 | bindings-update | Python PyO3 + Go FFI |
 | discovery-feature | K8s discovery, label pipeline |
 | grpc-backend | gRPC client, trace injection |

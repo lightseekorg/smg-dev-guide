@@ -7,7 +7,7 @@ description: Use when you need to understand the SMG codebase structure, find wh
 
 ## What Is SMG?
 
-High-performance Rust gateway for LLM inference backends. Routes requests to workers running vLLM, SGLang, TensorRT-LLM with 8 routing policies, KV cache optimization, K8s service discovery, WASM plugins, MCP tool execution, and mesh HA.
+High-performance Rust gateway for LLM inference backends. Routes requests to workers running vLLM, SGLang, TensorRT-LLM, MLX (and more) with 8 routing policies, KV cache optimization, K8s service discovery, WASM plugins, MCP tool execution, and mesh HA. Exposes OpenAI-, Anthropic-, and Gemini-compatible APIs (plus Responses, Conversations, and Realtime/WebSocket), with a priority admission scheduler, multi-tenancy, and rate limiting.
 
 ## Crate Map
 
@@ -20,17 +20,36 @@ High-performance Rust gateway for LLM inference backends. Routes requests to wor
 | `mesh` | HA cluster via SWIM gossip. CRDT KV store, partition detection, consistent hashing | `ClusterState`, `WorkerState`, `NodeStatus` |
 | `wasm` | WebAssembly plugin system. WIT interface, middleware hooks (OnRequest/OnResponse), LRU cache | `WasmModule`, `Action` (Continue/Reject/Modify) |
 | `mcp` | MCP protocol client. Tool discovery, execution, approval workflows, response format translation | `McpConfig`, `McpOrchestrator`, `ToolAnnotations` |
-| `grpc_client` | gRPC client for backends. Macros for dedup, streaming, trace injection | `SglangGrpcClient`, `VllmGrpcClient` |
-| `data_connector` | Pluggable storage: PostgreSQL, Oracle, Redis, in-memory. Hook system for interception | `StorageBackend` trait, `StorageHook` |
-| `tool_parser` | 13+ tool call parsers (JSON, Mistral, Qwen, DeepSeek, Pythonic, etc.). Streaming with incremental JSON | `ToolParser` trait, `ParserFactory`, `StreamingParseResult` |
-| `reasoning_parser` | Reasoning extraction from 10+ model families (DeepSeek-R1, Qwen3, Kimi, Cohere). Streaming | `ReasoningParser` trait, `ParserFactory`, `ParserResult` |
+| `grpc_client` | Per-engine gRPC clients for backends. Macros for shared logic; trace injection via `TraceInjector` | `SglangSchedulerClient`, `VllmEngineClient`, `TrtllmServiceClient` |
+| `data_connector` | Pluggable storage: PostgreSQL, Oracle, Redis, in-memory. Hook system for interception | `ConversationStorage`/`ConversationItemStorage`/`ResponseStorage` traits, `StorageHook` |
+| `tool_parser` | 14 tool call parsers (JSON, Mistral, Qwen, DeepSeek, Pythonic, etc.). Streaming with incremental JSON | `ToolParser` trait, `ParserFactory`, `StreamingParseResult` |
+| `reasoning_parser` | Reasoning extraction from 8 model families (DeepSeek-R1, Qwen3, Kimi, GLM, Step3, MiniMax, Cohere, Nano). Streaming | `ReasoningParser` trait, `ParserFactory`, `ParserResult` |
 | `tokenizer` | LLM tokenization, chat templates | `Tokenizer` |
-| `multimodal` | Image/audio processing. Per-model vision specs (LLaVA, Qwen-VL, Llama4, Phi3-V), media fetching | `ImageFrame`, `ChatContentPart`, `MediaConnector` |
+| `multimodal` | Image/audio processing (crate `llm-multimodal`). Per-model vision specs (LLaVA, Qwen-VL, Llama4, Phi3/4-V, Pixtral, Kimi-VL), media fetching | `ImageFrame`, `MediaContentPart`, `MediaConnector` |
 | `workflow` | Step-based async workflow engine (wfaas) | `StepExecutor`, `WorkflowContext` |
+| `skills` | Skills domain types + service scaffolding (early-stage; parsing/storage/CRUD/execution being filled in) | `smg-skills` |
+| `blob_storage` | Backend-neutral blob/object storage contract + filesystem-backed impl with local read cache. Backs the skills subsystem | `smg-blob-storage` |
 | `bindings/python` | PyO3 bindings. `Router` class with ~80 constructor params, enum mapping | `Router`, `PolicyType` |
 | `bindings/golang` | Go SDK via FFI (cgo). OpenAI-style API, streaming, tool calling | `Client`, `ChatCompletionRequest` |
 | `clients/rust` | Rust client library | |
+| `clients/python`, `clients/java` | Client SDKs generated from the OpenAPI spec | |
+| `clients/openapi-gen` | Generates the OpenAPI spec + Python/Java client SDKs from protocol types (`make generate-clients`) | |
+| `tui` | Terminal dashboard (`smg-tui`): monitor workers, route traffic, chat with models | `smg-tui` |
 | `grpc_servicer` | Python gRPC servicer wrapping vLLM/SGLang backends | |
+
+## Subsystems Inside `model_gateway`
+
+Beyond the crates, `model_gateway/src/` hosts several gateway-only subsystems. **There is no longer a `model_gateway/src/core/` directory** — routing and worker code moved to the locations below.
+
+| Subsystem | Location | Role | Key Types |
+|-----------|----------|------|-----------|
+| Routing policies | `policies/` | 8 load-balancing policies + factory + per-model registry | `LoadBalancingPolicy`, `PolicyFactory`, `PolicyRegistry`, `SelectWorkerInfo` |
+| Provider routers | `routers/` | OpenAI, Anthropic, Gemini APIs + Responses, Conversations, Realtime/WebSocket, Skills, gRPC | `RouterManager` |
+| Priority scheduler | `middleware/scheduler/` | Priority-aware admission, per-class queues, slots, preemption, capacity reservations, autoscaling metrics | `PriorityScheduler`, `SchedulerPermit`, `Class`, `AdmitOutcome`, `TenantPolicy` |
+| Multi-tenancy | `tenant.rs` + `middleware/tenant_resolution.rs` | Canonical tenant identity + per-request resolution | `TenantIdentity`, `TenantKey`, `DataPlaneCaller`, `RouteRequestMeta` |
+| Rate limiting | `middleware/token_bucket.rs`, `middleware/concurrency.rs` | Token-bucket rate limiting + concurrency caps | |
+| Memory | `memory/` | Conversation/request memory execution context | `MemoryExecutionContext`, `MemoryPolicyMode` |
+| Worker lifecycle | `worker/` + `workflow/steps/local/` | Worker registry, health/circuit breaking, and the discovery→create DAG | `WorkerManager`, `CreateLocalWorkerStep` |
 
 ## Layering Rule
 
@@ -42,7 +61,7 @@ model_gateway (implementation — ONE consumer writes each field)
 bindings/* (language SDKs — wrap model_gateway + protocols)
 ```
 
-**Directory layout**: Library crates live under `crates/` (e.g. `crates/mcp/`, `crates/mesh/`). `model_gateway/` and `bindings/` remain at repo root.
+**Directory layout**: Library crates live under `crates/` (e.g. `crates/mcp/`, `crates/mesh/`). `model_gateway/`, `bindings/`, `clients/`, and `tui/` remain at repo root.
 
 **Iron law**: If only one crate writes a field, it doesn't belong in `crates/protocols/`. K8s-specific, runtime-specific, or gateway-specific fields stay in `model_gateway`.
 
@@ -61,7 +80,8 @@ ServiceDiscoveryConfig / ServerConfig — typed, runtime
 ## Request Flow
 
 ```
-Client → HTTP/gRPC handler → Auth middleware → WASM OnRequest
+Client → HTTP/gRPC handler (OpenAI / Anthropic / Gemini router)
+  → Auth → Tenant resolution → Rate limit → Scheduler admission → WASM OnRequest
   → Routing policy selects worker → Proxy to backend
   → Stream response → Tool/reasoning parsing → WASM OnResponse → Client
 
@@ -69,15 +89,15 @@ Realtime (WebSocket):
 Client → WS upgrade → Realtime session registry → Proxy to backend WS
 ```
 
-## Worker Lifecycle (5-Step Workflow)
+## Worker Lifecycle (Discovery DAG)
+
+Steps live in `model_gateway/src/workflow/steps/local/` (a DAG, not a fixed 5-step list):
 
 ```
-K8s Pod → PodInfo::from_pod() → handle_pod_event() → Job::AddWorker
-  Step 1: Detect Runtime (sglang/vllm/trt)
-  Step 2: Discover Connection Mode (HTTP/gRPC)
-  Step 3: Discover DP Info (rank/size)
-  Step 4: Discover Metadata → flattens into labels HashMap
-  Step 5: Create Worker → merge labels, resolve model_id, build ModelCard
+K8s Pod → PodInfo::from_pod() (service_discovery.rs) → handle_pod_event() → AddWorker
+  classify_worker_type → detect_connection_mode → detect_backend (sglang/vllm/trt/tokenspeed/mlx)
+  → discover_metadata (flattens into labels HashMap) → discover_dp_info (rank/size)
+  → create_local_worker (merge labels, resolve model_id, build ModelCard)
 ```
 
 ## The Label Pipeline
@@ -95,6 +115,7 @@ cargo +nightly fmt --all                                      # Format
 cargo clippy --all-targets --all-features -- -D warnings      # Lint
 cargo test                                                     # Test
 make python-dev                                                # Python bindings
+make generate-clients                                          # Regenerate OpenAPI spec + Python/Java SDKs
 make pre-commit                                                # All checks
 ```
 

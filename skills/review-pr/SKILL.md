@@ -42,8 +42,10 @@ Do NOT write review comments, approve, or provide feedback until you have:
 | `model_gateway/src/config/` | 2 (Config Plumbing) |
 | `model_gateway/src/main.rs` | 2 (Config Plumbing) |
 | `model_gateway/src/service_discovery.rs` | 3 (Worker Lifecycle) |
-| `model_gateway/src/core/steps/worker/` | 3 (Worker Lifecycle) |
-| `model_gateway/src/core/routing/` | 4 (Routing Policy) |
+| `model_gateway/src/worker/`, `model_gateway/src/workflow/steps/local/` | 3 (Worker Lifecycle) |
+| `model_gateway/src/policies/` | 4 (Routing Policy) |
+| `model_gateway/src/routers/` (incl. `anthropic/`, `gemini/`) | 1 (Layering), 4 (Routing Policy) |
+| `model_gateway/src/middleware/` (scheduler, tenant_resolution, rate limit) | 1 (Layering), 10 (Architecture) — no dedicated section yet |
 | `crates/tool_parser/src/` | 5 (Parser Changes) |
 | `crates/reasoning_parser/src/` | 5 (Parser Changes) |
 | `crates/data_connector/src/` | 6 (Storage) |
@@ -82,8 +84,8 @@ Sections 7, 8, 9 always apply. Section 10 applies to PRs touching 3+ files or ad
 - [ ] Works for both HTTP and gRPC paths (`SelectWorkerInfo`)
 - [ ] All state is `Send + Sync` (DashMap, Arc — no bare Mutex on hot paths)
 - [ ] No `.unwrap()` on worker slices — handle empty list
-- [ ] Circuit breaker checked: `w.is_healthy() && w.circuit_breaker().can_execute()`
-- [ ] Policy registered in factory with config enum variant
+- [ ] Circuit breaker checked: `w.is_healthy() && w.circuit_breaker_can_execute()`
+- [ ] Policy implements `LoadBalancingPolicy` and is registered in `policies/factory.rs` with a `PolicyConfig` enum variant
 
 ### 5. Parser Changes (Tool / Reasoning)
 

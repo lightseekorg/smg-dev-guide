@@ -25,7 +25,7 @@ Per-subsystem anti-patterns to check during PR review.
 | Only testing HTTP path, missing gRPC | Feature breaks for gRPC backends | Test files that only use `RequestType::Http` |
 | Using `RwLock` on hot routing path | Contention under load | `RwLock` in routing policy structs (use `DashMap` instead) |
 | `.unwrap()` on empty worker slice | Panic when no workers available | `workers[0]` or `.unwrap()` on worker selection |
-| Skipping circuit breaker check | Routing to unhealthy backends | Missing `w.is_healthy() && w.circuit_breaker().can_execute()` |
+| Skipping circuit breaker check | Routing to unhealthy backends | Missing `w.is_healthy() && w.circuit_breaker_can_execute()` |
 
 ## Parsers (Tool / Reasoning)
 

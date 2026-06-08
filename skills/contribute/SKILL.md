@@ -96,17 +96,22 @@ let value = parse(input).context("parsing model config")?;
 |-----------------|-------|
 | Add CLI flag | `model_gateway/src/main.rs` (CliArgs) |
 | Change config | `model_gateway/src/config/types.rs` |
-| Change worker creation | `model_gateway/src/core/steps/worker/local/` |
+| Change worker creation | `model_gateway/src/worker/` (lifecycle steps: `model_gateway/src/workflow/steps/local/`) |
 | Change service discovery | `model_gateway/src/service_discovery.rs` |
 | Change API types | `crates/protocols/src/` (careful — shared by all crates) |
-| Add routing policy | `model_gateway/src/core/routing/` |
+| Add routing policy | `model_gateway/src/policies/` |
+| Change request scheduling / admission | `model_gateway/src/middleware/scheduler/` |
+| Change multi-tenancy | `model_gateway/src/tenant.rs`, `model_gateway/src/middleware/tenant_resolution.rs` |
+| Change rate limiting | `model_gateway/src/middleware/token_bucket.rs`, `model_gateway/src/middleware/concurrency.rs` |
+| Add/modify a provider API | `model_gateway/src/routers/{openai,anthropic,gemini}/` |
 | Add tool parser | `crates/tool_parser/src/parsers/` |
 | Add reasoning parser | `crates/reasoning_parser/src/parsers/` |
 | Update Python bindings | `bindings/python/src/lib.rs` |
 | Update Go SDK | `bindings/golang/` |
+| Regenerate client SDKs (after protocol changes) | `make generate-clients` (`clients/openapi-gen/`) |
 | Add storage backend | `crates/data_connector/src/` |
 | Add E2E tests | `e2e_test/` |
-| Add WASM middleware | `crates/wasm/examples/` |
+| Add WASM middleware | `examples/wasm/` (guests) + `crates/wasm/src/` (host) |
 | Add MCP tool support | `crates/mcp/src/` |
 
 ## Rationalization Prevention
