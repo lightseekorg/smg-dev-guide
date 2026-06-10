@@ -47,7 +47,6 @@ Do NOT write implementation code until you have:
 | Priority scheduler, admission, preemption, queue, reservation, autoscaling | @scheduler-feature.md |
 | Multi-tenancy, tenant, tenant policy, tenant resolution | @tenancy-feature.md |
 | Rate limit, token bucket, concurrency cap | @rate-limit-feature.md |
-| Conversation/request memory | @memory-feature.md |
 
 ### Subsystems without a dedicated recipe yet
 
@@ -56,7 +55,6 @@ These are real, actively-developed subsystems that don't yet have a step-by-step
 | Signal in User Request | Where it lives |
 |------------------------|----------------|
 | Provider API: Responses, Conversations, Realtime (for Anthropic/Gemini-style API routers see @provider-api.md) | `model_gateway/src/routers/{responses,conversations,openai/realtime}/` |
-| Skills subsystem | `crates/skills/`, `crates/blob_storage/`, `model_gateway/src/routers/skills/` |
 | Terminal UI | `tui/` |
 | Client SDK generation | `clients/openapi-gen/` (`make generate-clients`) |
 

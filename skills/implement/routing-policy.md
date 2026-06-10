@@ -8,8 +8,8 @@ Note: `dp_min_token.rs` implements a *different* trait, `DPRankLoadPolicy` (sele
 
 | Input | Example | Notes |
 |-------|---------|-------|
-| `POLICY_NAME` | `least_loaded` | Snake case. File name, `name()` return, factory key |
-| Struct name | `LeastLoadedPolicy` | PascalCase + `Policy` suffix |
+| `POLICY_NAME` | `my_policy` | Snake case. File name, `name()` return, factory key |
+| Struct name | `MyPolicy` | PascalCase + `Policy` suffix |
 | State | `AtomicUsize`, `RwLock<HashMap<..>>`, none | Must be `Send + Sync`. Stateless policies are unit structs (see `random.rs`) |
 | Routing input | none / `info.tokens` / `info.request_text` / `info.headers` | What drives selection (see Critical Rules) |
 | Config params | `load_factor: f64` | If tunable, needs a `PolicyConfig` variant — see @config-plumbing.md |
@@ -29,15 +29,15 @@ use super::{get_healthy_worker_indices, LoadBalancingPolicy, SelectWorkerInfo};
 use crate::worker::Worker;
 
 #[derive(Debug, Default)]
-pub struct LeastLoadedPolicy;
+pub struct MyPolicy;
 
-impl LeastLoadedPolicy {
+impl MyPolicy {
     pub fn new() -> Self {
         Self
     }
 }
 
-impl LoadBalancingPolicy for LeastLoadedPolicy {
+impl LoadBalancingPolicy for MyPolicy {
     fn select_worker(
         &self,
         workers: &[Arc<dyn Worker>],
@@ -55,7 +55,7 @@ impl LoadBalancingPolicy for LeastLoadedPolicy {
     }
 
     fn name(&self) -> &'static str {
-        "least_loaded"
+        "my_policy"
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
@@ -70,17 +70,17 @@ impl LoadBalancingPolicy for LeastLoadedPolicy {
 
 ### Step 2: Export the policy
 
-**File:** `model_gateway/src/policies/mod.rs` — add `mod {POLICY_NAME};` to the module block and `pub use {POLICY_NAME}::LeastLoadedPolicy;` to the re-exports.
+**File:** `model_gateway/src/policies/mod.rs` — add `mod {POLICY_NAME};` to the module block and `pub use {POLICY_NAME}::MyPolicy;` to the re-exports.
 
 **Verify:** `cargo check -p smg`
 
 ### Step 3: Add a config variant
 
-**File:** `model_gateway/src/config/types.rs` — add a variant to the `PolicyConfig` enum (with a `#[serde(rename = "least_loaded")]`), and a match arm in `PolicyConfig::name()`.
+**File:** `model_gateway/src/config/types.rs` — add a variant to the `PolicyConfig` enum (with a `#[serde(rename = "my_policy")]`), and a match arm in `PolicyConfig::name()`.
 
 ```rust
-#[serde(rename = "least_loaded")]
-LeastLoaded,
+#[serde(rename = "my_policy")]
+MyPolicy,
 ```
 
 Stateless policies are fieldless like `Random`/`RoundRobin`. For tunables, give the variant fields (`#[serde(default = "...")]`) and plumb them per @config-plumbing.md.
@@ -89,14 +89,14 @@ Stateless policies are fieldless like `Random`/`RoundRobin`. For tunables, give 
 
 ### Step 4: Register in the factory
 
-**File:** `model_gateway/src/policies/factory.rs` — add `LeastLoadedPolicy` to the `use super::{...}` list, then add a match arm to **both** functions:
+**File:** `model_gateway/src/policies/factory.rs` — add `MyPolicy` to the `use super::{...}` list, then add a match arm to **both** functions:
 
 ```rust
 // in create_from_config(config: &PolicyConfig)
-PolicyConfig::LeastLoaded => Arc::new(LeastLoadedPolicy::new()),
+PolicyConfig::MyPolicy => Arc::new(MyPolicy::new()),
 
 // in create_by_name(name: &str)  -- matched lowercased
-"least_loaded" | "leastloaded" => Some(Arc::new(LeastLoadedPolicy::new())),
+"my_policy" | "mypolicy" => Some(Arc::new(MyPolicy::new())),
 ```
 
 `PolicyRegistry` (`policies/registry.rs`) calls these to build the default/prefill/decode/per-model policies, so both arms are required: `create_from_config` for the configured policy, `create_by_name` for per-worker policy hints.
@@ -117,4 +117,4 @@ Invoke `smg:contribute` to run fmt -> clippy -> test -> bindings -> commit.
 - Header-based routing reads `info.headers: Option<&http::HeaderMap>` (e.g. `X-SMG-Target-Worker`, `X-SMG-Routing-Key`); consistent-hash policies use the prebuilt `info.hash_ring: Option<Arc<HashRing>>` rather than rebuilding per request.
 - State must be `Send + Sync`. Prefer `AtomicUsize` (round_robin) or `DashMap`; `power_of_two.rs` uses `RwLock<HashMap<..>>` for cached loads updated via `update_loads`. Never `.unwrap()` on worker access or hold a lock across `select_worker`.
 - Load-aware policies (those overriding `update_loads`) are fed by the registry only if discoverable — `power_of_two` is gathered by name via `get_all_power_of_two_policies()`; a new load-aware policy needs an equivalent hook to receive load updates.
-- There are 8 `LoadBalancingPolicy` impls (random, round_robin, power_of_two, cache_aware, bucket, manual, consistent_hashing, prefix_hash). Match an existing one rather than inventing API.
+- There are 9 `LoadBalancingPolicy` impls (random, round_robin, power_of_two, cache_aware, least_load, bucket, manual, consistent_hashing, prefix_hash). Match an existing one rather than inventing API.
