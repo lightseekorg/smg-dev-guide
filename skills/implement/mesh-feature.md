@@ -66,5 +66,6 @@ Only if neither LWW nor EpochMaxWins fits. Strategy logic lives entirely inside 
 - Op-id `(replica_id, timestamp)` must be globally unique per node — all engines share one `LamportClock`.
 - `apply_remote_ops` must emit a `CrdtChange` only when `get` actually changes (suppress idempotent re-applies), or subscribers get spurious events.
 - Ephemeral/lossy traffic (tenant deltas, tree repair) belongs in `StreamNamespace`, not CRDT — it is dropped under backpressure, not retried.
+- Gateway-side wiring lives in `model_gateway/src/mesh/wiring.rs` (`MeshAdapters::start`): it configures the CRDT prefixes/engines and starts each adapter's inbound sync **before** gossip starts (order matters — an unregistered engine drops to the default merge). A new replicated value that needs its own sync adapter is registered there.
 
 **Verify:** `cargo test -p smg-mesh`

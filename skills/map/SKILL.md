@@ -7,7 +7,7 @@ description: Use when you need to understand the SMG codebase structure, find wh
 
 ## What Is SMG?
 
-High-performance Rust gateway for LLM inference backends. Routes requests to workers running vLLM, SGLang, TensorRT-LLM, MLX (and more) with 8 routing policies, KV cache optimization, K8s service discovery, WASM plugins, MCP tool execution, and mesh HA. Exposes OpenAI-, Anthropic-, and Gemini-compatible APIs (plus Responses, Conversations, and Realtime/WebSocket), with a priority admission scheduler, multi-tenancy, and rate limiting.
+High-performance Rust gateway for LLM inference backends. Routes requests to workers running vLLM, SGLang, TensorRT-LLM, MLX (and more) with 9 routing policies, KV cache optimization, K8s service discovery, WASM plugins, MCP tool execution, and mesh HA. Exposes OpenAI-, Anthropic-, and Gemini-compatible APIs (plus Responses, Conversations, and Realtime/WebSocket), with a priority admission scheduler, multi-tenancy, and rate limiting.
 
 ## Crate Map
 
@@ -27,8 +27,6 @@ High-performance Rust gateway for LLM inference backends. Routes requests to wor
 | `tokenizer` | LLM tokenization, chat templates | `Tokenizer` |
 | `multimodal` | Image/audio processing (crate `llm-multimodal`). Per-model vision specs (LLaVA, Qwen-VL, Llama4, Phi3/4-V, Pixtral, Kimi-VL), media fetching | `ImageFrame`, `MediaContentPart`, `MediaConnector` |
 | `workflow` | Step-based async workflow engine (wfaas) | `StepExecutor`, `WorkflowContext` |
-| `skills` | Skills domain types + service scaffolding (early-stage; parsing/storage/CRUD/execution being filled in) | `smg-skills` |
-| `blob_storage` | Backend-neutral blob/object storage contract + filesystem-backed impl with local read cache. Backs the skills subsystem | `smg-blob-storage` |
 | `bindings/python` | PyO3 bindings. `Router` class with ~80 constructor params, enum mapping | `Router`, `PolicyType` |
 | `bindings/golang` | Go SDK via FFI (cgo). OpenAI-style API, streaming, tool calling | `Client`, `ChatCompletionRequest` |
 | `clients/rust` | Rust client library | |
@@ -43,12 +41,11 @@ Beyond the crates, `model_gateway/src/` hosts several gateway-only subsystems. *
 
 | Subsystem | Location | Role | Key Types |
 |-----------|----------|------|-----------|
-| Routing policies | `policies/` | 8 load-balancing policies + factory + per-model registry | `LoadBalancingPolicy`, `PolicyFactory`, `PolicyRegistry`, `SelectWorkerInfo` |
-| Provider routers | `routers/` | OpenAI, Anthropic, Gemini APIs + Responses, Conversations, Realtime/WebSocket, Skills, gRPC | `RouterManager` |
+| Routing policies | `policies/` | 9 load-balancing policies + factory + per-model registry | `LoadBalancingPolicy`, `PolicyFactory`, `PolicyRegistry`, `SelectWorkerInfo` |
+| Provider routers | `routers/` | OpenAI, Anthropic, Gemini APIs + Responses, Conversations, Realtime/WebSocket, gRPC | `RouterManager` |
 | Priority scheduler | `middleware/scheduler/` | Priority-aware admission, per-class queues, slots, preemption, capacity reservations, autoscaling metrics | `PriorityScheduler`, `SchedulerPermit`, `Class`, `AdmitOutcome`, `TenantPolicy` |
 | Multi-tenancy | `tenant.rs` + `middleware/tenant_resolution.rs` | Canonical tenant identity + per-request resolution | `TenantIdentity`, `TenantKey`, `DataPlaneCaller`, `RouteRequestMeta` |
 | Rate limiting | `middleware/token_bucket.rs`, `middleware/concurrency.rs` | Token-bucket rate limiting + concurrency caps | |
-| Memory | `memory/` | Conversation/request memory execution context | `MemoryExecutionContext`, `MemoryPolicyMode` |
 | Worker lifecycle | `worker/` + `workflow/steps/local/` | Worker registry, health/circuit breaking, and the discovery→create DAG | `WorkerManager`, `CreateLocalWorkerStep` |
 
 ## Layering Rule

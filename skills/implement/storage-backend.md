@@ -1,6 +1,6 @@
 # Adding a Storage Backend to SMG
 
-Storage backends live in `crates/data_connector/src/` as FLAT files (`memory.rs`, `redis.rs`, `postgres.rs`, `oracle.rs`, `noop.rs`) — never a directory. There is NO single `StorageBackend` trait: a backend implements three traits from `core.rs` — `ConversationStorage`, `ConversationItemStorage`, `ResponseStorage` — as three separate structs sharing one store handle. `ConversationMemoryWriter` is optional (only `memory.rs` provides a real one; everyone else uses `NoOpConversationMemoryWriter`). Hooks are applied by `create_storage` wrapping your structs in `Hooked*` decorators — a backend writes NO hook code itself. Model this on `redis.rs`.
+Storage backends live in `crates/data_connector/src/` as FLAT files (`memory.rs`, `redis.rs`, `postgres.rs`, `oracle.rs`, `noop.rs`) — never a directory. There is NO single `StorageBackend` trait: a backend implements three traits from `core.rs` — `ConversationStorage`, `ConversationItemStorage`, `ResponseStorage` — as three separate structs sharing one store handle. Hooks are applied by `create_storage` wrapping your structs in `Hooked*` decorators — a backend writes NO hook code itself. Model this on `redis.rs`.
 
 ## Inputs to gather first
 
@@ -71,7 +71,7 @@ impl ConversationStorage for MybackendConversationStorage {
 //   list_identifier_responses, delete_identifier_responses
 ```
 
-Errors are PER-DOMAIN, not unified: `ConversationStorageError`, `ConversationItemStorageError`, `ResponseStorageError` (and `ConversationMemoryStorageError`). Each has `StorageError(String)`, `SerializationError(#[from] serde_json::Error)`, and a not-found variant. `?` covers serde; wrap driver errors via `.map_err(|e| ...StorageError(e.to_string()))`.
+Errors are PER-DOMAIN, not unified: `ConversationStorageError`, `ConversationItemStorageError`, `ResponseStorageError`. Each has `StorageError(String)`, `SerializationError(#[from] serde_json::Error)`, and a not-found variant. `?` covers serde; wrap driver errors via `.map_err(|e| ...StorageError(e.to_string()))`.
 
 `ListParams { limit, order: SortOrder, after: Option<String> }` is cursor-based (`after` = item-id cursor) — page from it, don't offset-paginate.
 
@@ -89,7 +89,7 @@ Key-value backends (redis) need none. SQL backends add a `mybackend_migrations.r
 
 **File:** `crates/data_connector/src/factory.rs`
 
-Add a `HistoryBackend::Mybackend => { ... }` arm in `create_storage`. Build all three structs from one shared store and return a `StorageBundle { response_storage, conversation_storage, conversation_item_storage, conversation_memory_writer, background_repository }`. Use `Arc::new(NoOpConversationMemoryWriter::new())` and `background_repository: None` unless you implement those. Do NOT touch the hook-wrapping block at the end — it already wraps your structs in `Hooked*` when a `hook` is configured.
+Add a `HistoryBackend::Mybackend => { ... }` arm in `create_storage`. Build all three structs from one shared store and return a `StorageBundle { response_storage, conversation_storage, conversation_item_storage }` (exactly those three handles). Do NOT touch the hook-wrapping block at the end — it already wraps your structs in `Hooked*` when a `hook` is configured.
 
 ```rust
 HistoryBackend::Mybackend => {
@@ -99,8 +99,6 @@ HistoryBackend::Mybackend => {
         response_storage: Arc::new(MybackendResponseStorage::new(store.clone())),
         conversation_storage: Arc::new(MybackendConversationStorage::new(store.clone())),
         conversation_item_storage: Arc::new(MybackendConversationItemStorage::new(store)),
-        conversation_memory_writer: Arc::new(NoOpConversationMemoryWriter::new()),
-        background_repository: None,
     }
 }
 ```
@@ -121,6 +119,5 @@ Add `#[cfg(test)] mod tests` to `mybackend.rs` (round-trip each trait; cursor pa
 
 - Three structs / three traits, never a single `StorageBackend`. Hooks are wrapped by `create_storage`; the old `hooks.on_write/on_delete` calls do not exist.
 - Per-domain error enums — there is no unified `StorageError` type.
-- `ConversationMemoryWriter` is optional; default to `NoOpConversationMemoryWriter`.
 - Respect `SchemaConfig` (`col`/`is_skipped`) and append `resolve_extra_column_values` on writes so tenancy/hook columns persist.
 - Package `data-connector` (v2.2.0).
